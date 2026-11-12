@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '0 */4 * * *'
   workflow_dispatch:
+    inputs:
+      test_alert:
+        description: 'Send test Telegram alert'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -33,7 +39,11 @@ jobs:
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
           BINANCE_FAPI_BASE_URL: ${{ secrets.BINANCE_FAPI_BASE_URL }}
         run: |
-          python main.py
+          if [ "${{ inputs.test_alert }}" = "true" ]; then
+            python main.py --test-alert
+          else
+            python main.py
+          fi
 
       - name: Commit and push updated database and reports
         run: |
