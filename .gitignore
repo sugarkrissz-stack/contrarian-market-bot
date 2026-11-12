@@ -1,0 +1,23 @@
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Temporary DB journals
+data/*.db-shm
+data/*.db-wal
+
+# Explicitly tracked data & reports
+!data/market_intel.db
+!reports/latest_brief.md

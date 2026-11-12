@@ -1,0 +1,48 @@
+name: Contrarian Market Intelligence Bot
+
+on:
+  schedule:
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run-market-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run market intelligence collector and engine
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          BINANCE_FAPI_BASE_URL: ${{ secrets.BINANCE_FAPI_BASE_URL }}
+        run: |
+          python main.py
+
+      - name: Commit and push updated database and reports
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/market_intel.db reports/latest_brief.md
+          if git diff --staged --quiet; then
+            echo "No changes to market intelligence artifacts."
+          else
+            git commit -m "chore: automated market intelligence update [skip ci]"
+            git push origin main
+          fi
