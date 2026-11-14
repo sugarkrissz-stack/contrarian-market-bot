@@ -9,10 +9,10 @@
 
 ⚡ *Crypto Positioning:*
   • *Fear & Greed Index:* `13` (Extreme Fear)
-  • *BTC:* `$65,624` | APR: `+3.78%` | 4h OI Δ: `+0.94%` | Retail: `2.93` | Whale: `1.80`
-  • *ETH:* `$1,831.33` | APR: `-2.43%` | 4h OI Δ: `-0.01%` | Retail: `3.30` | Whale: `1.70`
+  • *BTC:* `$65,515` | APR: `-0.04%` | 4h OI Δ: `-0.11%` | Retail: `2.81` | Whale: `0.89`
+  • *ETH:* `$1,826.07` | APR: `-10.08%` | 4h OI Δ: `+0.12%` | Retail: `3.24` | Whale: `0.86`
 
-🎯 *Post-Open Directional Outlook:* *BULLISH REBOUND*
-  • Macro sentiment is washed out at 13/100 (Extreme Fear), setting up classic contrarian exhaustion conditions.
-  • Futures indicate resilient risk appetite: S&P Futures -0.42%, Nasdaq -1.23%, with DXY stable at 103.41.
-  • Recent OI flush (+0.47% 4h) cleaned out weak leverage, paving the way for cash-driven opening demand.
+🎯 *Post-Open Directional Outlook:* *SHORT-SQUEEZE WATCH*
+  • Negative funding persists on major perpetuals (ETH: -10.08%, BTC: -0.04% APR), indicating overcrowded short positioning vulnerable to a forced unwind.
+  • Extreme Macro Fear (13 - Extreme Fear) suggests panic is priced in; any pre-market equity stabilization can catalyze a sharp relief impulse.
+  • Equities pre-market: S&P -0.42%, NQ -1.23%. Watch the 09:30 ET opening tick for short covering volume.
