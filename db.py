@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Generator
+
+log = logging.getLogger(__name__)
 
 _DB_PATH: str | None = None
 
@@ -190,6 +194,70 @@ def latest_ratios(symbol: str) -> dict[str, Any] | None:
         )
         row = cur.fetchone()
         return dict(row) if row else None
+
+
+def prune_old_records(days: int = 14) -> dict[str, int]:
+    """Delete rows older than `days` days across all timestamped tables.
+
+    Preserves recent alert logs for the 24h cap and recent SEC filing records.
+    Runs VACUUM outside any open transaction so the SQLite file physically shrinks on disk.
+    """
+    assert _DB_PATH, "Call db.init() first"
+    cutoff_dt = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff_iso = cutoff_dt.isoformat(timespec="seconds")
+    cutoff_unix = int(cutoff_dt.timestamp())
+    cutoff_date = cutoff_dt.strftime("%Y-%m-%d")
+    cutoff_sqlite = cutoff_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    deleted_counts: dict[str, int] = {}
+
+    with _connect() as conn:
+        # 1. funding
+        cur = conn.execute("DELETE FROM funding WHERE ts < ?", (cutoff_iso,))
+        deleted_counts["funding"] = cur.rowcount
+
+        # 2. open_interest
+        cur = conn.execute("DELETE FROM open_interest WHERE ts < ?", (cutoff_iso,))
+        deleted_counts["open_interest"] = cur.rowcount
+
+        # 3. ls_ratios
+        cur = conn.execute("DELETE FROM ls_ratios WHERE ts < ?", (cutoff_iso,))
+        deleted_counts["ls_ratios"] = cur.rowcount
+
+        # 4. fear_greed (UNIX timestamp string or ISO)
+        cur = conn.execute(
+            """DELETE FROM fear_greed
+               WHERE (ts NOT LIKE '%-%' AND CAST(ts AS INTEGER) < ?)
+                  OR (ts LIKE '%-%' AND ts < ?)""",
+            (cutoff_unix, cutoff_iso),
+        )
+        deleted_counts["fear_greed"] = cur.rowcount
+
+        # 5. sec_filings (preserves recent filings within `days`)
+        cur = conn.execute("DELETE FROM sec_filings WHERE filed_date < ?", (cutoff_date,))
+        deleted_counts["sec_filings"] = cur.rowcount
+
+        # 6. alerts_log (preserves >= 24h of alerts for 24h hard cap and cooldowns)
+        cur = conn.execute("DELETE FROM alerts_log WHERE alerted_at < ?", (cutoff_sqlite,))
+        deleted_counts["alerts_log"] = cur.rowcount
+
+    # Execute VACUUM outside any open transaction to physically shrink the database file
+    conn = sqlite3.connect(_DB_PATH, timeout=10)
+    conn.isolation_level = None  # Autocommit mode - no open transaction
+    try:
+        conn.execute("VACUUM")
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    finally:
+        conn.close()
+
+    total_deleted = sum(deleted_counts.values())
+    log.info(
+        "Pruned %d old record(s) (>%dd): %s",
+        total_deleted,
+        days,
+        deleted_counts,
+    )
+    return deleted_counts
 
 
 # ─── Schema ───

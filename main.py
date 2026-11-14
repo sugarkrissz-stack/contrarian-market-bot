@@ -121,6 +121,9 @@ def run(cfg: dict, dry_run: bool = False) -> None:
     report_path = cfg.get("reports", {}).get("path", "reports/latest_brief.md")
     write_market_brief(binance_data, fng, sec_results, fired_signals, report_path)
 
+    # ── 8. Database Maintenance ──
+    db.prune_old_records(days=14)
+
     log.info(
         "✅ Run complete — %d signal(s) fired, %d symbol(s) scanned, %d SEC ticker(s)",
         len(fired_signals), len(binance_data), len(sec_results),
@@ -153,6 +156,9 @@ def run_daily_open_brief(cfg: dict, dry_run: bool = False) -> None:
     open_brief_path.parent.mkdir(parents=True, exist_ok=True)
     open_brief_path.write_text(brief_text, encoding="utf-8")
     log.info("Daily Open Brief saved → %s", open_brief_path)
+
+    # Database Maintenance
+    db.prune_old_records(days=14)
     log.info("✅ US Market Open Brief complete.")
 
 
