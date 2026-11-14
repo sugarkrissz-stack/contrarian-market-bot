@@ -23,21 +23,21 @@ cooldown:
 
 # ─── Contrarian Long Thresholds (Retail Fear / Short Squeeze Setup) ───
 contrarian_long:
-  fg_max: 32                     # Fear & Greed index <= this
-  oi_drop_4h_pct: 2.5            # 4h OI drop % >= this (i.e. delta <= -2.5%)
-  funding_apr_low: 0.0           # funding APR < this
-  basis_low_pct: -0.03           # basis % < this
-  retail_ls_max: 1.10            # retail L/S ratio <= this
-  whale_minus_retail_min: 0.35   # OR whale L/S - retail L/S >= this
+  fg_max: 20                     # Fear & Greed index <= 20 (Extreme Fear)
+  funding_apr_low: -8.0          # funding APR <= -8.0%
+  basis_low_pct: -0.03           # basis % < -0.03%
+  oi_drop_4h_pct: 3.0            # 4h OI drop % >= 3.0% (i.e. delta <= -3.0%)
+  retail_ls_max: 1.10            # retail L/S ratio <= 1.10
+  whale_minus_retail_min: 0.35   # OR whale L/S - retail L/S >= 0.35
 
 # ─── Contrarian Short Thresholds (Retail Euphoria / Long Trap Setup) ───
 contrarian_short:
-  fg_min: 70                     # Fear & Greed index >= this
-  oi_jump_4h_pct: 4.5            # 4h OI jump % >= this (i.e. delta >= +4.5%)
-  funding_apr_high: 22.0         # funding APR > this
-  basis_high_pct: 0.08           # basis % > this
-  retail_ls_min: 2.40            # retail L/S ratio >= this
-  retail_minus_whale_min: 0.80   # OR retail L/S - whale L/S >= this
+  fg_min: 80                     # Fear & Greed index >= 80 (Extreme Greed)
+  funding_apr_high: 20.0         # funding APR >= +20.0%
+  basis_high_pct: 0.08           # basis % > 0.08%
+  oi_jump_4h_pct: 4.0            # 4h OI jump % >= 4.0% (i.e. delta >= +4.0%)
+  retail_ls_min: 2.40            # retail L/S ratio >= 2.40
+  retail_minus_whale_min: 0.80   # OR retail L/S - whale L/S >= 0.80
 
 # Confluence: minimum conditions (of A, B, C) that must fire
 confluence_min_conditions: 2

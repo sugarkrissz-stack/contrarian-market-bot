@@ -75,6 +75,35 @@ def send_test_alert() -> bool:
         return False
 
 
+def send_daily_open_brief(brief_text: str, dry_run: bool = False) -> bool:
+    """Send guaranteed US Market Open Daily Brief to Telegram or log in dry-run."""
+    if dry_run:
+        log.info("[DRY-RUN] Would send Daily Open Brief to Telegram:\n%s", brief_text)
+        return True
+
+    token, chat_id = _get_creds()
+    if not token or not chat_id:
+        log.warning("Telegram credentials missing; Daily Open Brief not sent")
+        return False
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": brief_text,
+        "parse_mode": "Markdown",
+        "disable_web_page_preview": True,
+    }
+
+    try:
+        resp = requests.post(url, json=payload, timeout=12)
+        resp.raise_for_status()
+        log.info("Daily Open Brief sent successfully to Telegram")
+        return True
+    except Exception as e:
+        log.error("Daily Open Brief send failed: %s", e)
+        return False
+
+
 def _format_signal(signal: Signal) -> str:
     """Build Markdown message for Telegram."""
     badge = signal.badge or f"[{signal.symbol}]"

@@ -90,22 +90,23 @@ def score_crypto(
     long_conds: list[str] = []
     long_score = 0.0
 
-    # Condition A: Crowded Shorts
-    # funding_apr < funding_apr_low (0.0) OR basis < basis_low_pct (-0.03)
-    funding_apr_low = long_cfg.get("funding_apr_low", long_cfg.get("funding_apr_mild", 0.0))
-    basis_low_pct = long_cfg.get("basis_low_pct", long_cfg.get("basis_pct", -0.03))
+    # Gate A: Derivatives (Funding APR <= -8.0%, Basis < -0.03%, OR 4h OI delta <= -3.0%)
+    funding_apr_low = long_cfg.get("funding_apr_low", -8.0)
+    basis_low_pct = long_cfg.get("basis_low_pct", -0.03)
+    oi_drop_thresh = abs(long_cfg.get("oi_drop_4h_pct", 3.0))
 
-    if apr < funding_apr_low:
-        long_conds.append(f"A_funding_apr_low({apr:.2f}%<{funding_apr_low:.2f}%)")
+    if apr <= funding_apr_low:
+        long_conds.append(f"A_funding_apr_low({apr:.2f}%<={funding_apr_low:.2f}%)")
         long_score += 35
-    if basis < basis_low_pct:
-        if not any(c.startswith("A_") for c in long_conds):
-            long_conds.append(f"A_basis_discount({basis:.4f}%<{basis_low_pct:.4f}%)")
-        long_score += 15
+    elif basis < basis_low_pct:
+        long_conds.append(f"A_basis_discount({basis:.4f}%<{basis_low_pct:.4f}%)")
+        long_score += 20
+    if oi_delta is not None and oi_delta <= -oi_drop_thresh:
+        long_conds.append(f"A_oi_flush({oi_delta:.2f}%<=-{oi_drop_thresh:.2f}%)")
+        long_score += 30
 
-    # Condition B: Retail vs Whale Divergence
-    # retail_ls <= retail_ls_max (1.10) OR (whale_ls - retail_ls) >= whale_minus_retail_min (0.35)
-    retail_ls_max = long_cfg.get("retail_ls_max", long_cfg.get("retail_ratio_below", 1.10))
+    # Gate B: Retail vs Whale Divergence (Retail <= 1.10 OR Whale - Retail >= 0.35)
+    retail_ls_max = long_cfg.get("retail_ls_max", 1.10)
     whale_diff_min = long_cfg.get("whale_minus_retail_min", 0.35)
 
     if retail_ratio is not None:
@@ -116,18 +117,10 @@ def score_crypto(
             long_conds.append(f"B_whale_lead_divergence({whale_ratio - retail_ratio:.2f}>={whale_diff_min:.2f})")
             long_score += 30
 
-    # Condition C: Liquidation Flush + Macro Fear
-    # 4h OI drop % >= oi_drop_4h_pct (2.5%, i.e. delta <= -2.5%) AND fg <= fg_max (32)
-    oi_drop_thresh = abs(long_cfg.get("oi_drop_4h_pct", abs(long_cfg.get("oi_delta_4h_below", 2.5))))
-    fg_max = long_cfg.get("fg_max", long_cfg.get("fng_max", 32))
-
-    if (
-        oi_delta is not None
-        and fng_value is not None
-        and oi_delta <= -oi_drop_thresh
-        and fng_value <= fg_max
-    ):
-        long_conds.append(f"C_oi_drop_macro_fear(oi_delta={oi_delta:.2f}%,fg={fng_value})")
+    # Gate C: Sentiment (Fear & Greed <= 20 Extreme Fear)
+    fg_max = long_cfg.get("fg_max", 20)
+    if fng_value is not None and fng_value <= fg_max:
+        long_conds.append(f"C_macro_extreme_fear(fg={fng_value}<={fg_max})")
         long_score += 35
 
     long_groups = len({c[0] for c in long_conds})
@@ -138,22 +131,23 @@ def score_crypto(
     short_conds: list[str] = []
     short_score = 0.0
 
-    # Condition A: Crowded Longs
-    # funding_apr > funding_apr_high (22.0) OR basis > basis_high_pct (0.08)
-    funding_apr_high = short_cfg.get("funding_apr_high", 22.0)
-    basis_high_pct = short_cfg.get("basis_high_pct", short_cfg.get("basis_pct", 0.08))
+    # Gate A: Derivatives (Funding APR >= +20.0%, Basis > 0.08%, OR 4h OI delta >= +4.0%)
+    funding_apr_high = short_cfg.get("funding_apr_high", 20.0)
+    basis_high_pct = short_cfg.get("basis_high_pct", 0.08)
+    oi_jump_thresh = short_cfg.get("oi_jump_4h_pct", 4.0)
 
-    if apr > funding_apr_high:
-        short_conds.append(f"A_funding_apr_high({apr:.2f}%>{funding_apr_high:.2f}%)")
+    if apr >= funding_apr_high:
+        short_conds.append(f"A_funding_apr_high({apr:.2f}%>={funding_apr_high:.2f}%)")
         short_score += 35
-    if basis > basis_high_pct:
-        if not any(c.startswith("A_") for c in short_conds):
-            short_conds.append(f"A_basis_premium({basis:.4f}%>{basis_high_pct:.4f}%)")
-        short_score += 15
+    elif basis > basis_high_pct:
+        short_conds.append(f"A_basis_premium({basis:.4f}%>{basis_high_pct:.4f}%)")
+        short_score += 20
+    if oi_delta is not None and oi_delta >= oi_jump_thresh:
+        short_conds.append(f"A_oi_expansion({oi_delta:.2f}%>={oi_jump_thresh:.2f}%)")
+        short_score += 30
 
-    # Condition B: Retail Chasing
-    # retail_ls >= retail_ls_min (2.40) OR (retail_ls - whale_ls) >= retail_minus_whale_min (0.80)
-    retail_ls_min = short_cfg.get("retail_ls_min", short_cfg.get("retail_ratio_above", 2.40))
+    # Gate B: Retail Chasing (Retail >= 2.40 OR Retail - Whale >= 0.80)
+    retail_ls_min = short_cfg.get("retail_ls_min", 2.40)
     retail_diff_min = short_cfg.get("retail_minus_whale_min", 0.80)
 
     if retail_ratio is not None:
@@ -164,18 +158,10 @@ def score_crypto(
             short_conds.append(f"B_retail_whale_divergence({retail_ratio - whale_ratio:.2f}>={retail_diff_min:.2f})")
             short_score += 30
 
-    # Condition C: Leverage Overextension + Greed
-    # 4h OI jump % >= oi_jump_4h_pct (4.5%) AND fg >= fg_min (70)
-    oi_jump_thresh = short_cfg.get("oi_jump_4h_pct", short_cfg.get("oi_delta_4h_above", 4.5))
-    fg_min = short_cfg.get("fg_min", short_cfg.get("fng_min", 70))
-
-    if (
-        oi_delta is not None
-        and fng_value is not None
-        and oi_delta >= oi_jump_thresh
-        and fng_value >= fg_min
-    ):
-        short_conds.append(f"C_oi_jump_macro_greed(oi_delta={oi_delta:.2f}%,fg={fng_value})")
+    # Gate C: Sentiment (Fear & Greed >= 80 Extreme Greed)
+    fg_min = short_cfg.get("fg_min", 80)
+    if fng_value is not None and fng_value >= fg_min:
+        short_conds.append(f"C_macro_extreme_greed(fg={fng_value}>={fg_min})")
         short_score += 35
 
     short_groups = len({c[0] for c in short_conds})

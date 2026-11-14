@@ -2,11 +2,18 @@ name: Contrarian Market Intelligence Bot
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '17 * * * *'
+    - cron: '30 13 * * 1-5'
+    - cron: '30 14 * * 1-5'
   workflow_dispatch:
     inputs:
       test_alert:
         description: 'Send test Telegram alert'
+        type: boolean
+        required: false
+        default: false
+      daily_brief:
+        description: 'Send US Market Open Brief'
         type: boolean
         required: false
         default: false
@@ -39,9 +46,22 @@ jobs:
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
           BINANCE_FAPI_BASE_URL: ${{ secrets.BINANCE_FAPI_BASE_URL }}
         run: |
+          NY_HOUR=$(TZ="America/New_York" date +%-H)
+          NY_MIN=$(TZ="America/New_York" date +%-M)
+          NY_DOW=$(TZ="America/New_York" date +%u)
+          echo "Current America/New_York time: $NY_HOUR:$NY_MIN (weekday index $NY_DOW)"
+
           if [ "${{ inputs.test_alert }}" = "true" ]; then
+            echo "Running test alert..."
             python main.py --test-alert
+          elif [ "${{ inputs.daily_brief }}" = "true" ]; then
+            echo "Workflow dispatch requested daily open brief. Running Daily Open Brief..."
+            python main.py --daily-open-brief
+          elif [ "$NY_DOW" -le 5 ] && [ "$NY_HOUR" -eq 9 ] && [ "$NY_MIN" -ge 20 ] && [ "$NY_MIN" -le 45 ]; then
+            echo "Detected US Market Open window (09:20–09:45 ET). Running Daily Open Brief..."
+            python main.py --daily-open-brief
           else
+            echo "Running standard hourly contrarian scan..."
             python main.py
           fi
 
@@ -49,7 +69,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/market_intel.db reports/latest_brief.md
+          git add data/market_intel.db reports/latest_brief.md reports/latest_open_brief.md
           if git diff --staged --quiet; then
             echo "No changes to market intelligence artifacts."
           else

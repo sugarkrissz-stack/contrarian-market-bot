@@ -21,3 +21,4 @@ data/*.db-wal
 # Explicitly tracked data & reports
 !data/market_intel.db
 !reports/latest_brief.md
+!reports/latest_open_brief.md

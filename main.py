@@ -18,9 +18,10 @@ import yaml
 from dotenv import load_dotenv
 
 import db
-from collectors import binance_futures, sentiment, sec_edgar
+from collectors import binance_futures, sentiment, sec_edgar, macro_open
 from signals.signal_engine import score_crypto, filter_form4, passes_cooldown, Signal
-from notifiers.telegram import send_alert, send_test_alert, write_market_brief
+from notifiers.telegram import send_alert, send_test_alert, send_daily_open_brief, write_market_brief
+from engine.daily_brief import build_daily_open_brief
 
 # ─── Logging ───
 
@@ -126,10 +127,40 @@ def run(cfg: dict, dry_run: bool = False) -> None:
     )
 
 
+def run_daily_open_brief(cfg: dict, dry_run: bool = False) -> None:
+    """Generate and send guaranteed US Market Open Daily Brief."""
+    db_path = cfg.get("database", {}).get("path", "data/market_intel.db")
+    db.init(db_path)
+
+    log.info("━━━ Collecting US Market Open Data ━━━")
+    log.info("• Fetching Macro Pre-Market Assets...")
+    macro_data = macro_open.fetch_macro_open()
+
+    log.info("• Fetching Fear & Greed Index...")
+    fng = sentiment.fetch()
+
+    log.info("• Fetching Crypto Futures Positioning...")
+    all_symbols = cfg.get("symbols", {}).get("primary", []) + cfg.get("symbols", {}).get("secondary", [])
+    usdc_fb = cfg.get("usdc_to_usdt_fallback", {})
+    binance_data = binance_futures.collect_all(all_symbols, usdc_fb)
+
+    brief_text = build_daily_open_brief(macro_data, binance_data, fng)
+
+    log.info("━━━ Dispatching US Market Open Brief ━━━")
+    send_daily_open_brief(brief_text, dry_run=dry_run)
+
+    open_brief_path = Path("reports/latest_open_brief.md")
+    open_brief_path.parent.mkdir(parents=True, exist_ok=True)
+    open_brief_path.write_text(brief_text, encoding="utf-8")
+    log.info("Daily Open Brief saved → %s", open_brief_path)
+    log.info("✅ US Market Open Brief complete.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Contrarian Market Intelligence Bot")
     parser.add_argument("--dry-run", action="store_true", help="Collect & score without sending Telegram alerts")
     parser.add_argument("--test-alert", action="store_true", help="Send a test Telegram ping and exit")
+    parser.add_argument("--daily-open-brief", action="store_true", help="Generate and send US Market Open Brief (09:30 ET)")
     parser.add_argument("--config", default="config.yaml", help="Path to config file")
     args = parser.parse_args()
 
@@ -143,6 +174,10 @@ def main() -> None:
     if args.test_alert:
         ok = send_test_alert()
         sys.exit(0 if ok else 1)
+
+    if args.daily_open_brief:
+        run_daily_open_brief(cfg, dry_run=args.dry_run)
+        return
 
     run(cfg, dry_run=args.dry_run)
 
