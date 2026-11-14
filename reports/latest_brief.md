@@ -1,8 +1,8 @@
-# Contrarian Market Brief — 2026-11-13 20:42 UTC
+# Contrarian Market Brief — 2026-11-14 00:33 UTC
 
 ## Macro Sentiment
-- Fear & Greed Index: **20** (Extreme Fear)
-- Previous: **28** (Fear)
+- Fear & Greed Index: **13** (Extreme Fear)
+- Previous: **20** (Extreme Fear)
 
 ## Binance USDS-M Futures
 
