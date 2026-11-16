@@ -49,7 +49,10 @@ jobs:
           NY_HOUR=$(TZ="America/New_York" date +%-H)
           NY_MIN=$(TZ="America/New_York" date +%-M)
           NY_DOW=$(TZ="America/New_York" date +%u)
-          echo "Current America/New_York time: $NY_HOUR:$NY_MIN (weekday index $NY_DOW)"
+          NY_DATE=$(TZ="America/New_York" date +%F)
+          NY_MINS=$((NY_HOUR * 60 + NY_MIN))
+          LAST_BRIEF=$(cat reports/open_brief_sent.txt 2>/dev/null || true)
+          echo "Current America/New_York time: $NY_HOUR:$NY_MIN (weekday index $NY_DOW), last open brief sent: ${LAST_BRIEF:-never}"
 
           if [ "${{ inputs.test_alert }}" = "true" ]; then
             echo "Running test alert..."
@@ -57,8 +60,10 @@ jobs:
           elif [ "${{ inputs.daily_brief }}" = "true" ]; then
             echo "Workflow dispatch requested daily open brief. Running Daily Open Brief..."
             python main.py --daily-open-brief
-          elif [ "$NY_DOW" -le 5 ] && [ "$NY_HOUR" -eq 9 ] && [ "$NY_MIN" -ge 20 ] && [ "$NY_MIN" -le 45 ]; then
-            echo "Detected US Market Open window (09:20–09:45 ET). Running Daily Open Brief..."
+          elif [ "$NY_DOW" -le 5 ] && [ "$NY_MINS" -ge 560 ] && [ "$NY_MINS" -le 690 ] && [ "$LAST_BRIEF" != "$NY_DATE" ]; then
+            # 09:20–11:30 ET on weekdays, once per day. GitHub starts scheduled runs late
+            # or skips them, so a narrow window used to miss the brief entirely.
+            echo "Open brief not yet sent for $NY_DATE and inside 09:20–11:30 ET window. Running Daily Open Brief..."
             python main.py --daily-open-brief
           else
             echo "Running standard hourly contrarian scan..."
@@ -69,7 +74,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/market_intel.db reports/latest_brief.md reports/latest_open_brief.md
+          git add data reports
           if git diff --staged --quiet; then
             echo "No changes to market intelligence artifacts."
           else
