@@ -1,18 +1,18 @@
 🇺🇸 *US MARKET OPEN BRIEF — 09:30 ET*
-📅 `2026-11-16 | Pre-Market Snapshot`
+📅 `2026-11-17 | Pre-Market Snapshot`
 
 🌐 *Macro Pre-Market:*
-  • *S&P 500 Futures (ES):* `7,447.00` (`-1.79%`)
-  • *Nasdaq-100 Futures (NQ):* `27,355.00` (`-2.42%`)
-  • *US Dollar Index (DXY):* `103.577` (`+0.16%`)
-  • *10Y Treasury Yield:* `5.117%` (`-0.72%`)
+  • *S&P 500 Futures (ES):* `7,428.75` (`-0.14%`)
+  • *Nasdaq-100 Futures (NQ):* `27,362.75` (`+0.29%`)
+  • *US Dollar Index (DXY):* `103.620` (`+0.07%`)
+  • *10Y Treasury Yield:* `5.147%` (`+0.51%`)
 
 ⚡ *Crypto Positioning:*
-  • *Fear & Greed Index:* `10` (Extreme Fear)
-  • *BTC:* `$64,876` | APR: `+5.82%` | 4h OI Δ: `-1.29%` | Retail: `2.66` | Whale: `0.91`
-  • *ETH:* `$1,815.94` | APR: `+1.28%` | 4h OI Δ: `-2.27%` | Retail: `2.80` | Whale: `0.88`
+  • *Fear & Greed Index:* `12` (Extreme Fear)
+  • *BTC:* `$64,893` | APR: `-2.13%` | 4h OI Δ: `+1.57%` | Retail: `2.55` | Whale: `0.92`
+  • *ETH:* `$1,820.14` | APR: `-5.03%` | 4h OI Δ: `-0.27%` | Retail: `2.89` | Whale: `0.87`
 
 🎯 *Post-Open Directional Outlook:* *BEARISH CONTINUATION*
-  • Risk-off tone dominating global session: Nasdaq-100 Futures -2.42%, S&P -1.79%, and 10Y Yields -0.72%.
-  • Crypto retail accounts remain heavy (BTC: 2.66, ETH: 2.80) despite macro headwind, risking further long absorption.
-  • Fear & Greed index sits at 10 (Extreme Fear) with no clear signs of institutional accumulation yet.
+  • Risk-off tone dominating global session: Nasdaq-100 Futures +0.29%, S&P -0.14%, and 10Y Yields +0.51%.
+  • Crypto retail accounts remain heavy (BTC: 2.55, ETH: 2.89) despite macro headwind, risking further long absorption.
+  • Fear & Greed index sits at 12 (Extreme Fear) with no clear signs of institutional accumulation yet.
