@@ -1,4 +1,4 @@
-# Contrarian Market Brief — 2026-11-17 20:59 UTC
+# Contrarian Market Brief — 2026-11-17 21:58 UTC
 
 ## Macro Sentiment
 - Fear & Greed Index: **12** (Extreme Fear)
@@ -8,12 +8,11 @@
 
 | Symbol | Mark Price | Funding APR | Basis % | OI (USD) | 4h OI Δ | Retail L/S | Whale L/S |
 |--------|-----------|-------------|---------|----------|---------|------------|-----------|
-| BTCUSDC | $63,894.80 | +1.29% | +0.0376% | $1,995,084,604 | -0.80% | 3.0900 | 0.8932 |
-| BTCUSDT | $63,896.90 | +1.28% | -0.0544% | $1,994,767,818 | -0.80% | 3.0900 | 0.8932 |
-| ETHUSDC | $1,795.39 | -6.34% | +0.0591% | $1,197,800,022 | +0.29% | 3.3000 | 0.8595 |
-| ETHUSDT | $1,796.07 | -6.34% | -0.0340% | $1,197,800,022 | +0.29% | 3.3000 | 0.8595 |
+| BTCUSDC | $64,290.20 | -0.00% | +0.0447% | $1,997,847,166 | -0.39% | 3.1100 | 0.8951 |
+| BTCUSDT | $64,289.20 | -0.00% | -0.0490% | $1,997,847,166 | -0.39% | 3.1200 | 0.8951 |
+| ETHUSDC | $1,802.39 | -3.10% | +0.0461% | $1,199,829,007 | +0.48% | 3.3400 | 0.8604 |
+| ETHUSDT | $1,802.70 | -3.10% | -0.0460% | $1,199,829,007 | +0.48% | 3.3400 | 0.8604 |
 
-## Alerts Fired: 2
+## Alerts Fired: 0
 
-- **[P1 - BTC] LONG** (score 55) — Contrarian LONG — 2/3 conditions met: A_basis_discount(-0.0544%<-0.0300%), C_macro_extreme_fear(fg=12<=20)
-- **[P2 - ETH] LONG** (score 55) — Contrarian LONG — 2/3 conditions met: A_basis_discount(-0.0340%<-0.0300%), C_macro_extreme_fear(fg=12<=20)
+_No contrarian signals met the confluence gate this cycle._
