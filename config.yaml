@@ -23,21 +23,33 @@ cooldown:
 
 # ─── Contrarian Long Thresholds (Retail Fear / Short Squeeze Setup) ───
 contrarian_long:
-  fg_max: 20                     # Fear & Greed index <= 20 (Extreme Fear)
-  funding_apr_low: -8.0          # funding APR <= -8.0%
-  basis_low_pct: -0.03           # basis % < -0.03%
+  fg_max: 20                     # Fear & Greed index < 20 (Extreme Fear)
+  funding_rate_low: -0.00005     # 8h funding rate < -0.00005 (-0.005%, ~-5.48% APR)
+  funding_apr_low: -5.475        # APR equivalent for reference/fallback
+  basis_low_pct: -0.03           # basis % < -0.03% (vs baseline if enabled)
   oi_drop_4h_pct: 3.0            # 4h OI drop % >= 3.0% (i.e. delta <= -3.0%)
-  retail_ls_max: 1.10            # retail L/S ratio <= 1.10
+  retail_ls_max: 0.75            # retail L/S ratio < 0.75 (Shorts Crowded / Bounce Setup)
   whale_minus_retail_min: 0.35   # OR whale L/S - retail L/S >= 0.35
 
 # ─── Contrarian Short Thresholds (Retail Euphoria / Long Trap Setup) ───
 contrarian_short:
-  fg_min: 80                     # Fear & Greed index >= 80 (Extreme Greed)
-  funding_apr_high: 20.0         # funding APR >= +20.0%
-  basis_high_pct: 0.08           # basis % > 0.08%
+  fg_min: 80                     # Fear & Greed index > 80 (Extreme Greed)
+  funding_rate_high: 0.00025     # 8h funding rate > 0.00025 (+0.025%, ~+27.38% APR)
+  funding_apr_high: 27.375       # APR equivalent for reference/fallback
+  basis_high_pct: 0.08           # basis % > 0.08% (vs baseline if enabled)
   oi_jump_4h_pct: 4.0            # 4h OI jump % >= 4.0% (i.e. delta >= +4.0%)
-  retail_ls_min: 2.40            # retail L/S ratio >= 2.40
+  retail_ls_min: 2.60            # retail L/S ratio > 2.60 (Longs Crowded / Squeeze Risk)
   retail_minus_whale_min: 0.80   # OR retail L/S - whale L/S >= 0.80
+
+# ─── Market Shock / Liquidation Flush Rules (1-of-1 Immediate, 3h Cooldown) ───
+market_shock:
+  cooldown_hours: 3              # 3-hour per-symbol cooldown (never blocked by daily cap)
+  price_move_1h_pct: 3.5         # |1h price move| >= 3.5%
+  price_move_4h_pct: 4.5         # |4h price move| >= 4.5%
+  price_move_24h_pct: 5.0        # |24h price move| >= 5.0%
+  oi_flush_drop_pct: 5.0         # 1h or 4h OI drop >= 5.0% (liquidation flush)
+  capitulation_fg_max: 15        # Fear & Greed < 15
+  capitulation_24h_drop_pct: -4.5 # AND 24h price drop <= -4.5%
 
 # Basis is measured against each symbol's own normal level, not against zero.
 # A USDT-margined perp sits around -0.05% vs its index almost all the time, so a fixed

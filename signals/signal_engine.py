@@ -13,14 +13,158 @@ log = logging.getLogger(__name__)
 
 @dataclass
 class Signal:
-    source: str            # "crypto" | "sec"
+    source: str            # "crypto" | "sec" | "shock"
     symbol: str
-    direction: str         # "LONG" | "SHORT" | "INSIDER_BUY" | "INSIDER_SELL"
+    direction: str         # "LONG" | "SHORT" | "INSIDER_BUY" | "INSIDER_SELL" | "LIQUIDATION FLUSH" | "SHOCK DUMP" | "SHOCK PUMP" | "PANIC CAPITULATION"
     score: float           # 0-100
     conditions_met: list[str] = field(default_factory=list)
     metrics: dict[str, Any] = field(default_factory=dict)
     badge: str = ""
     reason: str = ""
+    trigger_type: str = "CONTRARIAN"  # "CONTRARIAN" | "SHOCK"
+
+
+def crowding_label(retail_ratio: float | None) -> str:
+    """Explicit label for retail L/S ratio crowding."""
+    if retail_ratio is None:
+        return "N/A"
+    if retail_ratio > 2.6:
+        return "Longs Crowded / Squeeze Risk"
+    if retail_ratio < 0.75:
+        return "Shorts Crowded / Bounce Setup"
+    return "Balanced"
+
+
+# ─── Market Shock / Liquidation Flush Scorer ───
+
+
+def evaluate_market_shock(
+    symbol: str,
+    shock_data: dict[str, Any] | None,
+    funding: dict[str, Any] | None,
+    ratios: dict[str, Any] | None,
+    fng: dict[str, Any] | None,
+    cfg: dict[str, Any] | None = None,
+) -> Signal | None:
+    """Evaluate symbol against independent Market Shock / Liquidation Flush rules.
+
+    Triggers 1-of-1 immediately without waiting for 2-of-3 contrarian confluence.
+    Conditions:
+      a) Absolute price move >= 3.5% in 1h, >= 4.5% in 4h, OR >= 5.0% in 24h.
+      b) Open Interest drops by >= 5.0% over 1h to 4h (liquidation flush).
+      c) Panic capitulation combo: Fear & Greed Index < 15 AND 24h price change <= -4.5%.
+    """
+    if not shock_data:
+        return None
+
+    cfg = cfg or {}
+    shock_cfg = cfg.get("market_shock", {})
+
+    p1 = shock_data.get("price_chg_1h_pct", 0.0)
+    p4 = shock_data.get("price_chg_4h_pct", 0.0)
+    p24 = shock_data.get("price_chg_24h_pct", 0.0)
+
+    oi1 = shock_data.get("oi_chg_1h_pct", 0.0)
+    oi4 = shock_data.get("oi_chg_4h_pct", 0.0)
+    oi_usd1 = shock_data.get("oi_usd_chg_1h_pct", 0.0)
+    oi_usd4 = shock_data.get("oi_usd_chg_4h_pct", 0.0)
+
+    fng_val = fng.get("value") if fng else None
+    retail_ratio = ratios.get("retail_ratio") if ratios else None
+    whale_ratio = ratios.get("whale_ratio") if ratios else None
+
+    # Thresholds
+    th_p1 = shock_cfg.get("price_move_1h_pct", 3.5)
+    th_p4 = shock_cfg.get("price_move_4h_pct", 4.5)
+    th_p24 = shock_cfg.get("price_move_24h_pct", 5.0)
+    th_oi = -abs(shock_cfg.get("oi_flush_drop_pct", 5.0))
+    th_fg = shock_cfg.get("capitulation_fg_max", 15)
+    th_cap_p24 = -abs(shock_cfg.get("capitulation_24h_drop_pct", 4.5))
+
+    reasons: list[str] = []
+    conds: list[str] = []
+
+    # Condition a: Absolute price move
+    price_shock_hit = False
+    if abs(p1) >= th_p1:
+        price_shock_hit = True
+        conds.append(f"1h_price_shock({p1:+.2f}% vs +/-{th_p1}%)")
+        reasons.append(f"1h price move {p1:+.2f}% (|Δ| >= {th_p1}%)")
+    if abs(p4) >= th_p4:
+        price_shock_hit = True
+        conds.append(f"4h_price_shock({p4:+.2f}% vs +/-{th_p4}%)")
+        reasons.append(f"4h price move {p4:+.2f}% (|Δ| >= {th_p4}%)")
+    if abs(p24) >= th_p24:
+        price_shock_hit = True
+        conds.append(f"24h_price_shock({p24:+.2f}% vs +/-{th_p24}%)")
+        reasons.append(f"24h price move {p24:+.2f}% (|Δ| >= {th_p24}%)")
+
+    # Condition b: OI drops >= 5.0% over 1h to 4h
+    oi_drop_hit = False
+    worst_oi_drop = min(oi1, oi4, oi_usd1, oi_usd4)
+    if oi1 <= th_oi or oi4 <= th_oi or oi_usd1 <= th_oi or oi_usd4 <= th_oi:
+        oi_drop_hit = True
+        conds.append(f"oi_flush(worst_drop={worst_oi_drop:+.2f}% <= {th_oi:.1f}%)")
+        reasons.append(f"Open Interest dropped {worst_oi_drop:+.2f}% (liquidation flush >= {abs(th_oi):.1f}%)")
+
+    # Condition c: Panic capitulation combo (F&G < 15 and 24h drop <= -4.5%)
+    cap_hit = False
+    if fng_val is not None and fng_val < th_fg and p24 <= th_cap_p24:
+        cap_hit = True
+        conds.append(f"panic_capitulation(fg={fng_val} < {th_fg}, 24h={p24:+.2f}% <= {th_cap_p24:+.1f}%)")
+        reasons.append(f"Panic capitulation: Fear & Greed {fng_val} < {th_fg} and 24h drop {p24:+.2f}%")
+
+    if not (price_shock_hit or oi_drop_hit or cap_hit):
+        return None
+
+    # Determine direction
+    if cap_hit:
+        direction = "PANIC CAPITULATION"
+    elif oi_drop_hit:
+        direction = "LIQUIDATION FLUSH"
+    elif price_shock_hit:
+        net_move = p1 if abs(p1) >= th_p1 else (p4 if abs(p4) >= th_p4 else p24)
+        direction = "SHOCK DUMP" if net_move < 0 else "SHOCK PUMP"
+    else:
+        direction = "MARKET SHOCK"
+
+    base_score = 80.0
+    if sum([price_shock_hit, oi_drop_hit, cap_hit]) >= 2:
+        base_score += 10.0
+    if abs(p1) >= 5.0 or abs(p24) >= 8.0 or worst_oi_drop <= -8.0:
+        base_score += 10.0
+    score = min(100.0, base_score)
+
+    rate = funding.get("funding_rate", 0.0) if funding else 0.0
+    apr = funding.get("annualized_apr", 0.0) if funding else 0.0
+    mark = funding.get("mark_price") if funding else shock_data.get("curr_price", 0.0)
+
+    metrics = {
+        "mark_price": mark,
+        "price_chg_1h": p1,
+        "price_chg_4h": p4,
+        "price_chg_24h": p24,
+        "oi_delta_1h": oi1,
+        "oi_delta_4h": oi4,
+        "funding_rate": rate,
+        "funding_apr": apr,
+        "retail_ls": retail_ratio,
+        "whale_ls": whale_ratio,
+        "crowding_label": crowding_label(retail_ratio),
+        "fng": fng_val,
+        "fng_class": fng.get("classification") if fng else None,
+    }
+
+    return Signal(
+        source="shock",
+        symbol=symbol,
+        direction=direction,
+        score=score,
+        conditions_met=conds,
+        metrics=metrics,
+        reason="; ".join(reasons),
+        trigger_type="SHOCK",
+    )
 
 
 # ─── Daily Cap Check ───
@@ -54,17 +198,16 @@ def score_crypto(
     fng: dict[str, Any] | None,
     cfg: dict[str, Any] | None = None,
     basis_baseline: float | None = None,
+    shock_data: dict[str, Any] | None = None,
 ) -> Signal | None:
     """Evaluate a single symbol against contrarian long and short gates.
 
     Requires at least 2 of 3 conditions (A, B, C) to fire.
 
-    `basis_baseline` is the symbol's trailing median basis %.  When
-    `basis_baseline.enabled` is true in the config (default), the basis thresholds are
-    applied to the deviation from that baseline instead of the raw value, because the raw
-    basis of a USDT-margined perp sits permanently around -0.05% and would otherwise
-    satisfy the "discount" gate on every run.  Without a baseline (thin history) the
-    basis arm is skipped rather than guessed.
+    Thresholds:
+      - Fear & Greed Index: < 20 (Extreme Fear) or > 80 (Extreme Greed)
+      - Funding Rate: < -0.00005 (-0.005%) or > 0.00025 (+0.025%)
+      - Long/Short Ratio: > 2.60 (Longs Crowded / Squeeze Risk) or < 0.75 (Shorts Crowded / Bounce Setup)
     """
     if not funding:
         return None
@@ -74,8 +217,9 @@ def score_crypto(
     short_cfg = cfg.get("contrarian_short", {})
     min_conditions = cfg.get("confluence_min_conditions", 2)
 
-    apr = funding.get("annualized_apr", 0)
-    basis = funding.get("basis_pct", 0)
+    apr = funding.get("annualized_apr", 0.0)
+    funding_rate = funding.get("funding_rate", 0.0)
+    basis = funding.get("basis_pct", 0.0)
     raw_basis = basis
     use_baseline = bool(cfg.get("basis_baseline", {}).get("enabled", True))
     basis_usable = True
@@ -86,20 +230,27 @@ def score_crypto(
             basis = raw_basis - basis_baseline
     retail_ratio = ratios.get("retail_ratio") if ratios else None
     whale_ratio = ratios.get("whale_ratio") if ratios else None
-    oi_delta = oi.get("oi_delta_4h_pct", 0) if oi else None
+    oi_delta = oi.get("oi_delta_4h_pct", 0.0) if oi else None
     fng_value = fng.get("value") if fng else None
 
     metrics = {
+        "funding_rate": funding_rate,
         "funding_apr": round(apr, 2),
         "basis_pct": round(raw_basis, 4),
         "basis_baseline": round(basis_baseline, 4) if basis_baseline is not None else None,
         "retail_ls": round(retail_ratio, 4) if retail_ratio else None,
         "whale_ls": round(whale_ratio, 4) if whale_ratio else None,
+        "crowding_label": crowding_label(retail_ratio),
         "oi_delta_4h": round(oi_delta, 2) if oi_delta is not None else None,
         "fng": fng_value,
         "fng_class": fng.get("classification") if fng else None,
         "mark_price": funding.get("mark_price"),
     }
+    if shock_data:
+        metrics["price_chg_1h"] = shock_data.get("price_chg_1h_pct")
+        metrics["price_chg_4h"] = shock_data.get("price_chg_4h_pct")
+        metrics["price_chg_24h"] = shock_data.get("price_chg_24h_pct")
+        metrics["oi_delta_1h"] = shock_data.get("oi_chg_1h_pct")
 
     # ──────────────────────────────────────────────────────────
     # Contrarian Long (Retail Fear / Short Squeeze Setup)
@@ -107,13 +258,16 @@ def score_crypto(
     long_conds: list[str] = []
     long_score = 0.0
 
-    # Gate A: Derivatives (Funding APR <= -8.0%, Basis < -0.03%, OR 4h OI delta <= -3.0%)
-    funding_apr_low = long_cfg.get("funding_apr_low", -8.0)
+    # Gate A: Derivatives (Funding Rate < -0.00005 / APR <= -5.48%, Basis discount, OR 4h OI delta <= -3.0%)
+    funding_rate_low = long_cfg.get("funding_rate_low", -0.00005)
+    funding_apr_low = long_cfg.get("funding_apr_low", -5.475)
     basis_low_pct = long_cfg.get("basis_low_pct", -0.03)
     oi_drop_thresh = abs(long_cfg.get("oi_drop_4h_pct", 3.0))
 
-    if apr <= funding_apr_low:
-        long_conds.append(f"A_funding_apr_low({apr:.2f}%<={funding_apr_low:.2f}%)")
+    if funding_rate < funding_rate_low or apr <= funding_apr_low:
+        long_conds.append(
+            f"A_funding_discount(rate={funding_rate*100:+.4f}%<{funding_rate_low*100:+.4f}%, apr={apr:+.2f}%)"
+        )
         long_score += 35
     elif basis_usable and basis < basis_low_pct:
         if use_baseline:
@@ -127,22 +281,24 @@ def score_crypto(
         long_conds.append(f"A_oi_flush({oi_delta:.2f}%<=-{oi_drop_thresh:.2f}%)")
         long_score += 30
 
-    # Gate B: Retail vs Whale Divergence (Retail <= 1.10 OR Whale - Retail >= 0.35)
-    retail_ls_max = long_cfg.get("retail_ls_max", 1.10)
+    # Gate B: Retail vs Whale Divergence (Retail < 0.75 [Shorts Crowded / Bounce Setup] OR Whale - Retail >= 0.35)
+    retail_ls_max = long_cfg.get("retail_ls_max", 0.75)
     whale_diff_min = long_cfg.get("whale_minus_retail_min", 0.35)
 
     if retail_ratio is not None:
-        if retail_ratio <= retail_ls_max:
-            long_conds.append(f"B_retail_ls_low({retail_ratio:.2f}<={retail_ls_max:.2f})")
-            long_score += 30
+        if retail_ratio < retail_ls_max:
+            long_conds.append(
+                f"B_retail_ls_low({retail_ratio:.4f}<{retail_ls_max:.2f}, Shorts Crowded / Bounce Setup)"
+            )
+            long_score += 35
         elif whale_ratio is not None and (whale_ratio - retail_ratio) >= whale_diff_min:
             long_conds.append(f"B_whale_lead_divergence({whale_ratio - retail_ratio:.2f}>={whale_diff_min:.2f})")
             long_score += 30
 
-    # Gate C: Sentiment (Fear & Greed <= 20 Extreme Fear)
+    # Gate C: Sentiment (Fear & Greed < 20 Extreme Fear)
     fg_max = long_cfg.get("fg_max", 20)
-    if fng_value is not None and fng_value <= fg_max:
-        long_conds.append(f"C_macro_extreme_fear(fg={fng_value}<={fg_max})")
+    if fng_value is not None and fng_value < fg_max:
+        long_conds.append(f"C_macro_extreme_fear(fg={fng_value}<{fg_max})")
         long_score += 35
 
     long_groups = len({c[0] for c in long_conds})
@@ -153,13 +309,16 @@ def score_crypto(
     short_conds: list[str] = []
     short_score = 0.0
 
-    # Gate A: Derivatives (Funding APR >= +20.0%, Basis > 0.08%, OR 4h OI delta >= +4.0%)
-    funding_apr_high = short_cfg.get("funding_apr_high", 20.0)
+    # Gate A: Derivatives (Funding Rate > 0.00025 / APR >= +27.38%, Basis premium, OR 4h OI delta >= +4.0%)
+    funding_rate_high = short_cfg.get("funding_rate_high", 0.00025)
+    funding_apr_high = short_cfg.get("funding_apr_high", 27.375)
     basis_high_pct = short_cfg.get("basis_high_pct", 0.08)
     oi_jump_thresh = short_cfg.get("oi_jump_4h_pct", 4.0)
 
-    if apr >= funding_apr_high:
-        short_conds.append(f"A_funding_apr_high({apr:.2f}%>={funding_apr_high:.2f}%)")
+    if funding_rate > funding_rate_high or apr >= funding_apr_high:
+        short_conds.append(
+            f"A_funding_premium(rate={funding_rate*100:+.4f}%>{funding_rate_high*100:+.4f}%, apr={apr:+.2f}%)"
+        )
         short_score += 35
     elif basis_usable and basis > basis_high_pct:
         if use_baseline:
@@ -173,22 +332,24 @@ def score_crypto(
         short_conds.append(f"A_oi_expansion({oi_delta:.2f}%>={oi_jump_thresh:.2f}%)")
         short_score += 30
 
-    # Gate B: Retail Chasing (Retail >= 2.40 OR Retail - Whale >= 0.80)
-    retail_ls_min = short_cfg.get("retail_ls_min", 2.40)
+    # Gate B: Retail Chasing (Retail > 2.60 [Longs Crowded / Squeeze Risk] OR Retail - Whale >= 0.80)
+    retail_ls_min = short_cfg.get("retail_ls_min", 2.60)
     retail_diff_min = short_cfg.get("retail_minus_whale_min", 0.80)
 
     if retail_ratio is not None:
-        if retail_ratio >= retail_ls_min:
-            short_conds.append(f"B_retail_chasing({retail_ratio:.2f}>={retail_ls_min:.2f})")
-            short_score += 30
+        if retail_ratio > retail_ls_min:
+            short_conds.append(
+                f"B_retail_chasing({retail_ratio:.4f}>{retail_ls_min:.2f}, Longs Crowded / Squeeze Risk)"
+            )
+            short_score += 35
         elif whale_ratio is not None and (retail_ratio - whale_ratio) >= retail_diff_min:
             short_conds.append(f"B_retail_whale_divergence({retail_ratio - whale_ratio:.2f}>={retail_diff_min:.2f})")
             short_score += 30
 
-    # Gate C: Sentiment (Fear & Greed >= 80 Extreme Greed)
+    # Gate C: Sentiment (Fear & Greed > 80 Extreme Greed)
     fg_min = short_cfg.get("fg_min", 80)
-    if fng_value is not None and fng_value >= fg_min:
-        short_conds.append(f"C_macro_extreme_greed(fg={fng_value}>={fg_min})")
+    if fng_value is not None and fng_value > fg_min:
+        short_conds.append(f"C_macro_extreme_greed(fg={fng_value}>{fg_min})")
         short_score += 35
 
     short_groups = len({c[0] for c in short_conds})
@@ -205,6 +366,7 @@ def score_crypto(
             conditions_met=long_conds,
             metrics=metrics,
             reason=f"Contrarian LONG — {long_groups}/3 conditions met: {', '.join(long_conds)}",
+            trigger_type="CONTRARIAN",
         )
 
     if short_groups >= min_conditions:
@@ -216,6 +378,7 @@ def score_crypto(
             conditions_met=short_conds,
             metrics=metrics,
             reason=f"Contrarian SHORT — {short_groups}/3 conditions met: {', '.join(short_conds)}",
+            trigger_type="CONTRARIAN",
         )
 
     log.debug(
@@ -320,18 +483,21 @@ def sibling_symbols(symbol: str, cfg: dict[str, Any]) -> list[str]:
 
 
 def dedupe_signals(signals: list[Signal]) -> list[Signal]:
-    """Keep one crypto signal per (underlying asset, direction): the highest score.
+    """Keep one signal per (underlying asset, direction/type): the highest score.
 
-    BTCUSDT and BTCUSDC describe the same market; alerting both used up the daily cap on
-    one idea.  Ties keep the first one in the input order.  Non-crypto signals pass through.
+    BTCUSDT and BTCUSDC describe the same market; alerting both used up the daily cap or
+    sent duplicate shock alerts. Ties keep the first one in input order. Non-crypto/non-shock
+    pass through.
     """
     best: dict[tuple[str, str], Signal] = {}
     order: list[Signal | tuple[str, str]] = []
     for sig in signals:
-        if sig.source != "crypto":
+        if sig.source == "sec":
             order.append(sig)
             continue
-        key = (base_asset(sig.symbol), sig.direction)
+        # Crypto and Shock signals keyed by underlying asset
+        action_key = "SHOCK" if (sig.source == "shock" or sig.trigger_type == "SHOCK") else sig.direction
+        key = (base_asset(sig.symbol), action_key)
         if key not in best:
             best[key] = sig
             order.append(key)
@@ -344,8 +510,27 @@ def dedupe_signals(signals: list[Signal]) -> list[Signal]:
 
 
 def passes_cooldown(signal: Signal, cfg: dict[str, Any]) -> bool:
-    """Return True if signal passes the 24h daily cap AND 12h per-symbol cooldown."""
-    # Gate 1: Check 24-hour hard cap (max_alerts_per_day)
+    """Return True if signal passes cooldown and cap rules.
+
+    Market Shock alerts use a separate 3-hour per-symbol cooldown and are NEVER blocked
+    by the 12-hour contrarian cooldown or daily contrarian cap.
+    Standard contrarian & SEC alerts pass through the 24h daily cap and 12h per-symbol cooldown.
+    """
+    # ── Market Shock Cooldown Check (3h separate cooldown, bypasses daily cap) ──
+    if signal.source == "shock" or signal.trigger_type == "SHOCK":
+        shock_cfg = cfg.get("market_shock", {})
+        hours = shock_cfg.get("cooldown_hours", 3)
+        check_symbols = sibling_symbols(signal.symbol, cfg)
+        for s in check_symbols:
+            if db.check_shock_cooldown(s, cooldown_hours=hours):
+                log.info(
+                    "Market Shock cooldown suppressed (%dh): %s %s (related to %s)",
+                    hours, signal.symbol, signal.direction, s,
+                )
+                return False
+        return True
+
+    # ── Standard Contrarian & SEC: Gate 1: Check 24-hour hard cap (max_alerts_per_day) ──
     if not check_daily_alert_cap(cfg):
         max_alerts = cfg.get("max_alerts_per_day", 2)
         log.info(
@@ -354,7 +539,7 @@ def passes_cooldown(signal: Signal, cfg: dict[str, Any]) -> bool:
         )
         return False
 
-    # Gate 2: 12h per-symbol cooldown
+    # ── Standard Contrarian & SEC: Gate 2: 12h per-symbol cooldown ──
     cd_cfg = cfg.get("cooldown", {})
     hours = cd_cfg.get("hours", 12)
     esc_pct = cd_cfg.get("escalation_pct", 40)

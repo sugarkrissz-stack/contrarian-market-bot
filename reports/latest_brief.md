@@ -1,18 +1,20 @@
-# Contrarian Market Brief — 2026-11-18 09:11 UTC
+# Contrarian Market Brief — 2026-11-18 09:38 UTC
 
 ## Macro Sentiment
 - Fear & Greed Index: **11** (Extreme Fear)
 - Previous: **12** (Extreme Fear)
 
-## Binance USDS-M Futures
+## Perpetual Futures & Shock Metrics
 
-| Symbol | Mark Price | Funding APR | Basis % | OI (USD) | 4h OI Δ | Retail L/S | Whale L/S |
-|--------|-----------|-------------|---------|----------|---------|------------|-----------|
-| BTCUSDC | $64,689.60 | +1.62% | +0.0249% | $2,016,710,673 | +1.00% | 2.6900 | 0.9084 |
-| BTCUSDT | $64,685.70 | +1.62% | -0.0587% | $2,016,710,673 | +1.00% | 2.6900 | 0.9084 |
-| ETHUSDC | $1,811.36 | -1.14% | +0.0282% | $1,247,372,771 | +1.09% | 2.9900 | 0.8693 |
-| ETHUSDT | $1,811.33 | -1.14% | -0.0574% | $1,247,372,771 | +1.01% | 2.9900 | 0.8693 |
+_Data source this run: Binance_
+
+| Symbol | Mark Price | 1h Price Δ | 4h Price Δ | 24h Price Δ | 1h OI Δ | 4h OI Δ | Funding (8h / APR) | Retail L/S (Crowding) | Whale L/S |
+|--------|-----------|------------|------------|-------------|---------|---------|---------------------|-----------------------|-----------|
+| BTCUSDC | $64,617.00 | +0.04% | +0.06% | +0.55% | +0.27% | +1.03% | +0.0016% / +1.71% | 2.4953 | 1.6977 |
+| BTCUSDT | $64,684.70 | +0.04% | +0.06% | +0.55% | +0.27% | +1.03% | +0.0005% / +0.53% | 2.0902 | 1.8621 |
+| ETHUSDC | $1,811.81 | +0.13% | +0.16% | +0.12% | +0.34% | +1.18% | -0.0006% / -0.64% | 2.8685 (Longs Crowded / Squeeze Risk) | 0.9643 |
+| ETHUSDT | $1,813.59 | +0.13% | +0.16% | +0.12% | +0.34% | +1.18% | +0.0041% / +4.54% | 2.5100 | 1.7052 |
 
 ## Alerts Fired: 0
 
-_No contrarian signals met the confluence gate this cycle._
+_No shock or contrarian signals fired this cycle._

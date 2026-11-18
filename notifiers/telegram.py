@@ -124,28 +124,69 @@ def _format_signal(signal: Signal) -> str:
     """
     esc = html.escape
     badge = esc(signal.badge or f"[{signal.symbol}]")
+    trigger_type = getattr(signal, "trigger_type", "SHOCK" if signal.source == "shock" else "CONTRARIAN")
+    trigger_badge = f"[{trigger_type}]"
+
     lines = [
-        f"⚡ <b>{badge} {esc(signal.direction)}</b>",
+        f"⚡ <b>{badge} {trigger_badge} {esc(signal.direction)}</b>",
         f"Signal Score: <code>{signal.score:.0f}/100</code>",
+        f"<b>Trigger Type:</b> <code>{trigger_type}</code>",
         "",
     ]
 
     m = signal.metrics
-    if signal.source == "crypto":
-        lines.append("📊 <b>Metrics:</b>")
-        if m.get("funding_apr") is not None:
-            lines.append(f"  Funding APR: <code>{m['funding_apr']:+.2f}%</code>")
-        if m.get("basis_pct") is not None:
-            lines.append(f"  Basis: <code>{m['basis_pct']:+.4f}%</code>")
-        if m.get("retail_ls") is not None:
-            lines.append(f"  Retail L/S: <code>{m['retail_ls']:.4f}</code>")
-        if m.get("whale_ls") is not None:
-            lines.append(f"  Whale L/S: <code>{m['whale_ls']:.4f}</code>")
-        if m.get("oi_delta_4h") is not None:
-            lines.append(f"  4h OI Δ: <code>{m['oi_delta_4h']:+.2f}%</code>")
+    if signal.source in ("crypto", "shock"):
+        lines.append("📊 <b>Market Dynamics:</b>")
+        if m.get("mark_price") is not None:
+            lines.append(f"  • Mark Price: <code>${m['mark_price']:,.2f}</code>")
+
+        # 1h / 4h / 24h price %
+        p1 = m.get("price_chg_1h")
+        p4 = m.get("price_chg_4h")
+        p24 = m.get("price_chg_24h")
+        price_parts = []
+        if p1 is not None:
+            price_parts.append(f"1h: <code>{p1:+.2f}%</code>")
+        if p4 is not None:
+            price_parts.append(f"4h: <code>{p4:+.2f}%</code>")
+        if p24 is not None:
+            price_parts.append(f"24h: <code>{p24:+.2f}%</code>")
+        if price_parts:
+            lines.append(f"  • Price Moves: {' | '.join(price_parts)}")
+
+        # 1h-4h OI %
+        oi1 = m.get("oi_delta_1h")
+        oi4 = m.get("oi_delta_4h")
+        oi_parts = []
+        if oi1 is not None:
+            oi_parts.append(f"1h: <code>{oi1:+.2f}%</code>")
+        if oi4 is not None:
+            oi_parts.append(f"4h: <code>{oi4:+.2f}%</code>")
+        if oi_parts:
+            lines.append(f"  • Open Interest Δ: {' | '.join(oi_parts)}")
+
+        # Funding rate (8h rate & APR)
+        fr = m.get("funding_rate")
+        apr = m.get("funding_apr")
+        if fr is not None and apr is not None:
+            lines.append(f"  • Funding Rate: <code>{fr*100:+.4f}% ({apr:+.2f}% APR)</code>")
+        elif apr is not None:
+            lines.append(f"  • Funding APR: <code>{apr:+.2f}%</code>")
+
+        # L/S ratio with crowding direction
+        rls = m.get("retail_ls")
+        wls = m.get("whale_ls")
+        crowd = m.get("crowding_label") or ""
+        if rls is not None:
+            crowd_str = f" (<b>{esc(crowd)}</b>)" if crowd and crowd != "Balanced" else ""
+            lines.append(f"  • Retail L/S: <code>{rls:.4f}</code>{crowd_str}")
+        if wls is not None:
+            lines.append(f"  • Whale L/S: <code>{wls:.4f}</code>")
+
+        # Fear & Greed index
         if m.get("fng") is not None:
             lines.append(
-                f"  Fear &amp; Greed: <code>{esc(str(m['fng']))}</code> ({esc(str(m.get('fng_class', '')))})"
+                f"  • Fear &amp; Greed: <code>{esc(str(m['fng']))}</code> ({esc(str(m.get('fng_class', '')))})"
             )
     elif signal.source == "sec":
         lines.append("📋 <b>SEC Filing:</b>")
@@ -160,7 +201,7 @@ def _format_signal(signal: Signal) -> str:
         lines.append(f"  10b5-1: <code>{'Yes' if m.get('is_10b51') else 'No'}</code>")
 
     lines.append("")
-    lines.append(f"💡 <i>{esc(signal.reason)}</i>")
+    lines.append(f"💡 <b>Reason:</b> <i>{esc(signal.reason)}</i>")
     return "\n".join(lines)
 
 
@@ -187,33 +228,58 @@ def write_market_brief(
 
     # Fear & Greed
     if fng:
-        lines.append(f"## Macro Sentiment")
+        lines.append("## Macro Sentiment")
         lines.append(f"- Fear & Greed Index: **{fng['value']}** ({fng['classification']})")
         if fng.get("prev_value") is not None:
             lines.append(f"- Previous: **{fng['prev_value']}** ({fng.get('prev_classification', '')})")
         lines.append("")
 
-    # Perpetual futures table (source differs per run: Binance, or OKX when Binance blocks the runner)
-    lines.append("## Perpetual Futures")
+    # Perpetual futures table
+    lines.append("## Perpetual Futures & Shock Metrics")
     lines.append("")
     if data_source:
         lines.append(f"_Data source this run: {data_source}_")
         lines.append("")
-    lines.append("| Symbol | Mark Price | Funding APR | Basis % | OI (USD) | 4h OI Δ | Retail L/S | Whale L/S |")
-    lines.append("|--------|-----------|-------------|---------|----------|---------|------------|-----------|")
+    lines.append(
+        "| Symbol | Mark Price | 1h Price Δ | 4h Price Δ | 24h Price Δ | 1h OI Δ | 4h OI Δ | Funding (8h / APR) | Retail L/S (Crowding) | Whale L/S |"
+    )
+    lines.append(
+        "|--------|-----------|------------|------------|-------------|---------|---------|---------------------|-----------------------|-----------|"
+    )
 
     for sym, d in binance_data.items():
         f = d.get("funding") or {}
         o = d.get("oi") or {}
         r = d.get("ratios") or {}
+        sh = d.get("shock") or {}
+
+        p1_str = f"{sh['price_chg_1h_pct']:+.2f}%" if "price_chg_1h_pct" in sh else "—"
+        p4_str = f"{sh['price_chg_4h_pct']:+.2f}%" if "price_chg_4h_pct" in sh else "—"
+        p24_str = f"{sh['price_chg_24h_pct']:+.2f}%" if "price_chg_24h_pct" in sh else "—"
+
+        oi1_str = f"{sh['oi_chg_1h_pct']:+.2f}%" if "oi_chg_1h_pct" in sh else "—"
+        oi4_val = sh.get("oi_chg_4h_pct", o.get("oi_delta_4h_pct"))
+        oi4_str = f"{oi4_val:+.2f}%" if oi4_val is not None else "—"
+
+        fr = f.get("funding_rate", 0.0)
+        apr = f.get("annualized_apr", 0.0)
+        funding_str = f"{fr*100:+.4f}% / {apr:+.2f}%" if fr else f"{apr:+.2f}% APR"
+
+        rls = r.get("retail_ratio", 0)
+        from signals.signal_engine import crowding_label
+        crowd = crowding_label(rls)
+        rls_str = f"{rls:.4f} ({crowd})" if crowd != "Balanced" else f"{rls:.4f}"
+
         lines.append(
             f"| {sym} "
             f"| ${f.get('mark_price', 0):,.2f} "
-            f"| {f.get('annualized_apr', 0):+.2f}% "
-            f"| {f.get('basis_pct', 0):+.4f}% "
-            f"| ${o.get('oi_usd', 0):,.0f} "
-            f"| {o.get('oi_delta_4h_pct', 0):+.2f}% "
-            f"| {r.get('retail_ratio', 0):.4f} "
+            f"| {p1_str} "
+            f"| {p4_str} "
+            f"| {p24_str} "
+            f"| {oi1_str} "
+            f"| {oi4_str} "
+            f"| {funding_str} "
+            f"| {rls_str} "
             f"| {r.get('whale_ratio', 0):.4f} |"
         )
     lines.append("")
@@ -239,9 +305,33 @@ def write_market_brief(
     lines.append("")
     if signals:
         for s in signals:
-            lines.append(f"- **{s.badge} {s.direction}** (score {s.score:.0f}) — {s.reason}")
+            ttype = getattr(s, "trigger_type", "SHOCK" if s.source == "shock" else "CONTRARIAN")
+            lines.append(f"### ⚡ {s.badge} [{ttype}] {s.direction} (Score: {s.score:.0f}/100)")
+            lines.append(f"- **Trigger Type:** {ttype}")
+            lines.append(f"- **Exact Reason:** {s.reason}")
+            m = s.metrics
+            if s.source in ("crypto", "shock"):
+                p_parts = []
+                for k in ("price_chg_1h", "price_chg_4h", "price_chg_24h"):
+                    if m.get(k) is not None:
+                        p_parts.append(f"{k[-3:]} Δ: {m[k]:+.2f}%")
+                if p_parts:
+                    lines.append(f"- **Price Moves:** {' | '.join(p_parts)}")
+                oi_parts = []
+                for k in ("oi_delta_1h", "oi_delta_4h"):
+                    if m.get(k) is not None:
+                        oi_parts.append(f"{k[-3:]} Δ: {m[k]:+.2f}%")
+                if oi_parts:
+                    lines.append(f"- **Open Interest Δ:** {' | '.join(oi_parts)}")
+                if m.get("funding_rate") is not None and m.get("funding_apr") is not None:
+                    lines.append(f"- **Funding Rate:** {m['funding_rate']*100:+.4f}% ({m['funding_apr']:+.2f}% APR)")
+                if m.get("retail_ls") is not None:
+                    lines.append(f"- **Retail L/S:** {m['retail_ls']:.4f} ({m.get('crowding_label', 'Balanced')})")
+                if m.get("fng") is not None:
+                    lines.append(f"- **Fear & Greed:** {m['fng']} ({m.get('fng_class', '')})")
+            lines.append("")
     else:
-        lines.append("_No contrarian signals met the confluence gate this cycle._")
+        lines.append("_No shock or contrarian signals fired this cycle._")
     lines.append("")
 
     p.write_text("\n".join(lines), encoding="utf-8")

@@ -6,6 +6,9 @@ from signals.signal_engine import (
     filter_form4,
     passes_cooldown,
     check_daily_alert_cap,
+    evaluate_market_shock,
+    crowding_label,
+    dedupe_signals,
 )
 
 __all__ = [
@@ -14,4 +17,7 @@ __all__ = [
     "filter_form4",
     "passes_cooldown",
     "check_daily_alert_cap",
+    "evaluate_market_shock",
+    "crowding_label",
+    "dedupe_signals",
 ]

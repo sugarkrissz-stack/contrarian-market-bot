@@ -137,6 +137,19 @@ def check_cooldown(source: str, symbol: str, signal_type: str,
         return True
 
 
+def check_shock_cooldown(symbol: str, cooldown_hours: int = 3) -> bool:
+    """Return True if a Market Shock alert was already fired for this symbol within `cooldown_hours`."""
+    with _connect() as conn:
+        cur = conn.execute(
+            """SELECT 1 FROM alerts_log
+               WHERE source='shock' AND symbol=?
+                 AND alerted_at > datetime('now', ?)
+               LIMIT 1""",
+            (symbol, f"-{cooldown_hours} hours"),
+        )
+        return cur.fetchone() is not None
+
+
 def record_alert(source: str, symbol: str, signal_type: str, score: float) -> None:
     with _connect() as conn:
         conn.execute(
@@ -147,11 +160,15 @@ def record_alert(source: str, symbol: str, signal_type: str, score: float) -> No
 
 
 def count_alerts_last_24h() -> int:
-    """Return number of alerts logged in the last 24 hours."""
+    """Return number of standard contrarian alerts logged in the last 24 hours.
+
+    Excludes Market Shock alerts so shock alerts never burn the daily contrarian cap.
+    """
     with _connect() as conn:
         cur = conn.execute(
             """SELECT COUNT(*) FROM alerts_log
-               WHERE alerted_at > datetime('now', '-24 hours')"""
+               WHERE source != 'shock'
+                 AND alerted_at > datetime('now', '-24 hours')"""
         )
         row = cur.fetchone()
         return int(row[0]) if row else 0
