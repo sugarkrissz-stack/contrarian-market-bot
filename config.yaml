@@ -39,6 +39,16 @@ contrarian_short:
   retail_ls_min: 2.40            # retail L/S ratio >= 2.40
   retail_minus_whale_min: 0.80   # OR retail L/S - whale L/S >= 0.80
 
+# Basis is measured against each symbol's own normal level, not against zero.
+# A USDT-margined perp sits around -0.05% vs its index almost all the time, so a fixed
+# "basis < -0.03%" test is permanently true. With this on, basis_low_pct / basis_high_pct
+# above mean "percentage points below / above the trailing median basis".
+# With fewer than min_samples rows of history, the basis arm is skipped (no guessing).
+basis_baseline:
+  enabled: true
+  days: 7                        # trailing window for the median
+  min_samples: 24                # minimum history rows before a baseline is trusted
+
 # Confluence: minimum conditions (of A, B, C) that must fire
 confluence_min_conditions: 2
 

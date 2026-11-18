@@ -157,6 +157,28 @@ def count_alerts_last_24h() -> int:
         return int(row[0]) if row else 0
 
 
+def basis_baseline(symbol: str, days: int = 7, min_samples: int = 24) -> float | None:
+    """Median basis % for `symbol` over the last `days` days.
+
+    Perp-vs-index basis has a persistent, symbol-specific offset (e.g. USDT-margined
+    contracts sit around -0.05% on OKX nearly all the time), so a fixed threshold on the
+    raw value fires permanently.  The median is the symbol's "normal"; signals should
+    measure deviation from it.  Returns None when there are fewer than `min_samples`
+    rows, so a thin history never produces a baseline-based signal.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT basis_pct FROM funding WHERE symbol=? AND ts >= ? AND basis_pct IS NOT NULL",
+            (symbol, cutoff),
+        ).fetchall()
+    values = sorted(float(r[0]) for r in rows)
+    if len(values) < min_samples:
+        return None
+    mid = len(values) // 2
+    return values[mid] if len(values) % 2 else (values[mid - 1] + values[mid]) / 2
+
+
 def latest_fng() -> dict[str, Any] | None:
     with _connect() as conn:
         cur = conn.execute(

@@ -21,7 +21,9 @@ from dotenv import load_dotenv
 
 import db
 from collectors import binance_futures, sentiment, sec_edgar, macro_open
-from signals.signal_engine import score_crypto, filter_form4, passes_cooldown, Signal
+from signals.signal_engine import (
+    score_crypto, filter_form4, passes_cooldown, dedupe_signals, Signal,
+)
 from notifiers.telegram import send_alert, send_test_alert, send_daily_open_brief, write_market_brief
 from engine.daily_brief import build_daily_open_brief
 
@@ -59,11 +61,13 @@ def run(cfg: dict, dry_run: bool = False) -> None:
     log.info("━━━ Collecting Fear & Greed ━━━")
     fng = sentiment.fetch()
 
-    # ── 2. Collect Binance Futures ──
-    log.info("━━━ Collecting Binance Futures ━━━")
+    # ── 2. Collect Perpetual Futures (Binance, OKX fallback) ──
+    log.info("━━━ Collecting Perpetual Futures Data ━━━")
     all_symbols = cfg.get("symbols", {}).get("primary", []) + cfg.get("symbols", {}).get("secondary", [])
     usdc_fb = cfg.get("usdc_to_usdt_fallback", {})
     binance_data = binance_futures.collect_all(all_symbols, usdc_fb)
+    data_source = binance_futures.data_source()
+    log.info("Futures data source this run: %s", data_source)
 
     # ── 3. Collect SEC EDGAR ──
     log.info("━━━ Collecting SEC EDGAR ━━━")
@@ -83,7 +87,11 @@ def run(cfg: dict, dry_run: bool = False) -> None:
     badges = cfg.get("priority_badges", {})
     candidates: list[Signal] = []
 
+    bl_cfg = cfg.get("basis_baseline", {})
     for sym, data in binance_data.items():
+        baseline = db.basis_baseline(
+            sym, days=bl_cfg.get("days", 7), min_samples=bl_cfg.get("min_samples", 24)
+        )
         signal = score_crypto(
             symbol=sym,
             funding=data.get("funding"),
@@ -91,6 +99,7 @@ def run(cfg: dict, dry_run: bool = False) -> None:
             ratios=data.get("ratios"),
             fng=fng,
             cfg=cfg,
+            basis_baseline=baseline,
         )
         if signal:
             signal.badge = resolve_badge(sym, badges)
@@ -114,6 +123,11 @@ def run(cfg: dict, dry_run: bool = False) -> None:
     # send so alerts already delivered earlier in this run are counted.
     log.info("━━━ Notifications ━━━")
     fired_signals: list[Signal] = []
+    # One alert per underlying asset and direction (BTCUSDT + BTCUSDC are the same idea).
+    n_before = len(candidates)
+    candidates = dedupe_signals(candidates)
+    if len(candidates) < n_before:
+        log.info("De-duplicated %d signal(s) on the same underlying asset", n_before - len(candidates))
     for sig in candidates:
         if not passes_cooldown(sig, cfg):
             log.info("⏳ Cooldown/cap: %s %s %s", sig.source, sig.symbol, sig.direction)
@@ -131,7 +145,7 @@ def run(cfg: dict, dry_run: bool = False) -> None:
 
     # ── 7. Write Market Brief ──
     report_path = cfg.get("reports", {}).get("path", "reports/latest_brief.md")
-    write_market_brief(binance_data, fng, sec_results, fired_signals, report_path)
+    write_market_brief(binance_data, fng, sec_results, fired_signals, report_path, data_source)
 
     # ── 8. Database Maintenance ──
     db.prune_old_records(days=14)
@@ -159,7 +173,9 @@ def run_daily_open_brief(cfg: dict, dry_run: bool = False) -> None:
     usdc_fb = cfg.get("usdc_to_usdt_fallback", {})
     binance_data = binance_futures.collect_all(all_symbols, usdc_fb)
 
-    brief_text = build_daily_open_brief(macro_data, binance_data, fng)
+    brief_text = build_daily_open_brief(
+        macro_data, binance_data, fng, data_source=binance_futures.data_source()
+    )
 
     log.info("━━━ Dispatching US Market Open Brief ━━━")
     delivered = send_daily_open_brief(brief_text, dry_run=dry_run)
