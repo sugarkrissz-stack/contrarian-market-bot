@@ -53,10 +53,18 @@ def score_crypto(
     ratios: dict[str, Any] | None,
     fng: dict[str, Any] | None,
     cfg: dict[str, Any] | None = None,
+    basis_baseline: float | None = None,
 ) -> Signal | None:
     """Evaluate a single symbol against contrarian long and short gates.
 
     Requires at least 2 of 3 conditions (A, B, C) to fire.
+
+    `basis_baseline` is the symbol's trailing median basis %.  When
+    `basis_baseline.enabled` is true in the config (default), the basis thresholds are
+    applied to the deviation from that baseline instead of the raw value, because the raw
+    basis of a USDT-margined perp sits permanently around -0.05% and would otherwise
+    satisfy the "discount" gate on every run.  Without a baseline (thin history) the
+    basis arm is skipped rather than guessed.
     """
     if not funding:
         return None
@@ -68,6 +76,14 @@ def score_crypto(
 
     apr = funding.get("annualized_apr", 0)
     basis = funding.get("basis_pct", 0)
+    raw_basis = basis
+    use_baseline = bool(cfg.get("basis_baseline", {}).get("enabled", True))
+    basis_usable = True
+    if use_baseline:
+        if basis_baseline is None:
+            basis_usable = False
+        else:
+            basis = raw_basis - basis_baseline
     retail_ratio = ratios.get("retail_ratio") if ratios else None
     whale_ratio = ratios.get("whale_ratio") if ratios else None
     oi_delta = oi.get("oi_delta_4h_pct", 0) if oi else None
@@ -75,7 +91,8 @@ def score_crypto(
 
     metrics = {
         "funding_apr": round(apr, 2),
-        "basis_pct": round(basis, 4),
+        "basis_pct": round(raw_basis, 4),
+        "basis_baseline": round(basis_baseline, 4) if basis_baseline is not None else None,
         "retail_ls": round(retail_ratio, 4) if retail_ratio else None,
         "whale_ls": round(whale_ratio, 4) if whale_ratio else None,
         "oi_delta_4h": round(oi_delta, 2) if oi_delta is not None else None,
@@ -98,8 +115,13 @@ def score_crypto(
     if apr <= funding_apr_low:
         long_conds.append(f"A_funding_apr_low({apr:.2f}%<={funding_apr_low:.2f}%)")
         long_score += 35
-    elif basis < basis_low_pct:
-        long_conds.append(f"A_basis_discount({basis:.4f}%<{basis_low_pct:.4f}%)")
+    elif basis_usable and basis < basis_low_pct:
+        if use_baseline:
+            long_conds.append(
+                f"A_basis_discount({basis:+.4f}pt vs {raw_basis - basis:+.4f}% median, limit {basis_low_pct:.4f}pt)"
+            )
+        else:
+            long_conds.append(f"A_basis_discount({basis:.4f}%<{basis_low_pct:.4f}%)")
         long_score += 20
     if oi_delta is not None and oi_delta <= -oi_drop_thresh:
         long_conds.append(f"A_oi_flush({oi_delta:.2f}%<=-{oi_drop_thresh:.2f}%)")
@@ -139,8 +161,13 @@ def score_crypto(
     if apr >= funding_apr_high:
         short_conds.append(f"A_funding_apr_high({apr:.2f}%>={funding_apr_high:.2f}%)")
         short_score += 35
-    elif basis > basis_high_pct:
-        short_conds.append(f"A_basis_premium({basis:.4f}%>{basis_high_pct:.4f}%)")
+    elif basis_usable and basis > basis_high_pct:
+        if use_baseline:
+            short_conds.append(
+                f"A_basis_premium({basis:+.4f}pt vs {raw_basis - basis:+.4f}% median, limit {basis_high_pct:.4f}pt)"
+            )
+        else:
+            short_conds.append(f"A_basis_premium({basis:.4f}%>{basis_high_pct:.4f}%)")
         short_score += 20
     if oi_delta is not None and oi_delta >= oi_jump_thresh:
         short_conds.append(f"A_oi_expansion({oi_delta:.2f}%>={oi_jump_thresh:.2f}%)")
@@ -267,6 +294,52 @@ def filter_form4(
     )
 
 
+# ─── One Signal Per Underlying Asset ───
+
+_QUOTE_SUFFIXES = ("USDT", "USDC")
+
+
+def base_asset(symbol: str) -> str:
+    """BTCUSDT / BTCUSDC -> BTC (the underlying both pairs track)."""
+    s = symbol.upper()
+    for q in _QUOTE_SUFFIXES:
+        if s.endswith(q) and len(s) > len(q):
+            return s[: -len(q)]
+    return s
+
+
+def sibling_symbols(symbol: str, cfg: dict[str, Any]) -> list[str]:
+    """All configured symbols on the same underlying (always includes `symbol`)."""
+    sym_cfg = cfg.get("symbols", {})
+    configured = list(sym_cfg.get("primary", [])) + list(sym_cfg.get("secondary", []))
+    base = base_asset(symbol)
+    sibs = [s for s in configured if base_asset(s) == base]
+    if symbol not in sibs:
+        sibs.append(symbol)
+    return sibs
+
+
+def dedupe_signals(signals: list[Signal]) -> list[Signal]:
+    """Keep one crypto signal per (underlying asset, direction): the highest score.
+
+    BTCUSDT and BTCUSDC describe the same market; alerting both used up the daily cap on
+    one idea.  Ties keep the first one in the input order.  Non-crypto signals pass through.
+    """
+    best: dict[tuple[str, str], Signal] = {}
+    order: list[Signal | tuple[str, str]] = []
+    for sig in signals:
+        if sig.source != "crypto":
+            order.append(sig)
+            continue
+        key = (base_asset(sig.symbol), sig.direction)
+        if key not in best:
+            best[key] = sig
+            order.append(key)
+        elif sig.score > best[key].score:
+            best[key] = sig
+    return [best[item] if isinstance(item, tuple) else item for item in order]
+
+
 # ─── Cooldown and Hard Cap Check ───
 
 
@@ -286,8 +359,12 @@ def passes_cooldown(signal: Signal, cfg: dict[str, Any]) -> bool:
     hours = cd_cfg.get("hours", 12)
     esc_pct = cd_cfg.get("escalation_pct", 40)
 
-    suppressed = db.check_cooldown(
-        signal.source, signal.symbol, signal.direction, hours, esc_pct, signal.score
+    # For crypto, the cooldown covers every pair on the same underlying, so an alert for
+    # BTCUSDT also holds back BTCUSDC (and the other way round).
+    check_symbols = sibling_symbols(signal.symbol, cfg) if signal.source == "crypto" else [signal.symbol]
+    suppressed = any(
+        db.check_cooldown(signal.source, s, signal.direction, hours, esc_pct, signal.score)
+        for s in check_symbols
     )
     if suppressed:
         log.info(

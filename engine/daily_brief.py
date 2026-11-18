@@ -117,6 +117,7 @@ def build_daily_open_brief(
     macro: dict[str, dict[str, Any]],
     crypto: dict[str, dict[str, Any]],
     fng: dict[str, Any] | None,
+    data_source: str = "",
 ) -> str:
     """Construct formatted Markdown message for the US Market Open Brief."""
     now_utc = datetime.now(timezone.utc)
@@ -145,7 +146,7 @@ def build_daily_open_brief(
         lines.append(f"  • *10Y Treasury Yield:* `{tnx['price']:.3f}%` (`{tnx['change_pct']:+.2f}%`)")
 
     lines.append("")
-    lines.append("⚡ *Crypto Positioning:*")
+    lines.append("⚡ *Crypto Positioning:*" + (f" (data: {data_source})" if data_source else ""))
     if fng:
         lines.append(f"  • *Fear & Greed Index:* `{fng.get('value')}` ({fng.get('classification', '')})")
 

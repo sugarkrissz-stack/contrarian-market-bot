@@ -173,6 +173,7 @@ def write_market_brief(
     sec_filings: dict[str, list],
     signals: list[Signal],
     report_path: str = "reports/latest_brief.md",
+    data_source: str = "",
 ) -> None:
     """Write/overwrite the latest market snapshot markdown."""
     p = Path(report_path)
@@ -192,9 +193,12 @@ def write_market_brief(
             lines.append(f"- Previous: **{fng['prev_value']}** ({fng.get('prev_classification', '')})")
         lines.append("")
 
-    # Binance futures table
-    lines.append("## Binance USDS-M Futures")
+    # Perpetual futures table (source differs per run: Binance, or OKX when Binance blocks the runner)
+    lines.append("## Perpetual Futures")
     lines.append("")
+    if data_source:
+        lines.append(f"_Data source this run: {data_source}_")
+        lines.append("")
     lines.append("| Symbol | Mark Price | Funding APR | Basis % | OI (USD) | 4h OI Δ | Retail L/S | Whale L/S |")
     lines.append("|--------|-----------|-------------|---------|----------|---------|------------|-----------|")
 

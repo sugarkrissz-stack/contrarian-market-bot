@@ -40,6 +40,22 @@ _session.headers.update({
 
 _binance_blocked: bool = os.getenv("BINANCE_FORCE_OKX", "").strip().lower() in ("1", "true", "yes")
 
+# Which exchanges actually supplied data during the current collect_all() run.
+_sources_used: set[str] = set()
+
+
+def data_source() -> str:
+    """Human-readable source of the last collection, for reports and logs.
+
+    GitHub-hosted runners are geo-blocked by Binance (HTTP 451), so the data usually
+    comes from OKX even though this module is named after Binance.
+    """
+    if not _sources_used:
+        return "no data"
+    if _sources_used == {"OKX"} and _binance_blocked:
+        return "OKX (Binance blocked from this server)"
+    return " + ".join(sorted(_sources_used))
+
 
 class BinanceCollectorError(Exception):
     pass
@@ -155,6 +171,7 @@ def fetch_okx_funding(symbol: str) -> dict[str, Any] | None:
         "basis_pct": round(basis, 6),
         "next_funding_time": next_time,
     }
+    _sources_used.add("OKX")
     db.insert_funding(row)
     log.info(
         "[OKX] %s (%s)  funding_apr=%.2f%%  basis=%.4f%%  mark=%.2f",
@@ -199,6 +216,7 @@ def fetch_okx_open_interest(symbol: str) -> dict[str, Any] | None:
         "oi_usd": round(oi_usd, 2),
         "oi_delta_4h_pct": round(delta_pct, 4),
     }
+    _sources_used.add("OKX")
     db.insert_oi(row)
     log.info(
         "[OKX] %s (%s)  OI=$%.0f  4h_delta=%.2f%%",
@@ -242,6 +260,7 @@ def fetch_okx_ratios(symbol: str) -> dict[str, Any] | None:
         "retail_ratio": round(retail, 4) if retail is not None else None,
         "whale_ratio": round(whale, 4) if whale is not None else None,
     }
+    _sources_used.add("OKX")
     db.insert_ratios(row)
     log.info(
         "[OKX] %s (%s)  retail_L/S=%.4f  whale_L/S=%.4f",
@@ -276,6 +295,7 @@ def fetch_premium_index(symbol: str) -> dict[str, Any] | None:
                 "basis_pct": round(basis, 6),
                 "next_funding_time": data.get("nextFundingTime", ""),
             }
+            _sources_used.add("Binance")
             db.insert_funding(row)
             log.info(
                 "%s  funding_apr=%.2f%%  basis=%.4f%%  mark=%.2f",
@@ -311,6 +331,7 @@ def fetch_open_interest(symbol: str) -> dict[str, Any] | None:
                     "oi_usd": round(current_oi, 2),
                     "oi_delta_4h_pct": round(delta_pct, 4),
                 }
+                _sources_used.add("Binance")
                 db.insert_oi(row)
                 log.info(
                     "%s  OI=$%.0f  4h_delta=%.2f%%",
@@ -375,6 +396,7 @@ def fetch_ratios(
                     "retail_ratio": round(retail, 4) if retail else None,
                     "whale_ratio": round(whale, 4) if whale else None,
                 }
+                _sources_used.add("Binance")
                 db.insert_ratios(row)
                 log.info(
                     "%s  retail_L/S=%.4f  whale_L/S=%.4f",
@@ -401,6 +423,7 @@ def collect_all(
     """Run collectors for every symbol (Binance primary, OKX fallback); return per-symbol dicts."""
     results: dict[str, dict[str, Any]] = {}
     fb = usdc_fallback or {}
+    _sources_used.clear()
 
     for sym in symbols:
         funding = fetch_premium_index(sym)
