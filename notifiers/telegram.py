@@ -219,8 +219,13 @@ def write_market_brief(
     signals: list[Signal],
     report_path: str = "reports/latest_brief.md",
     data_source: str = "",
+    shock_context: list[Signal] | None = None,
 ) -> None:
-    """Write/overwrite the latest market snapshot markdown."""
+    """Write/overwrite the latest market snapshot markdown.
+
+    `shock_context` lists market-shock detections that were NOT sent as alerts (default mode):
+    they are informational, shown below the alerts.
+    """
     p = Path(report_path)
     p.parent.mkdir(parents=True, exist_ok=True)
 
@@ -276,7 +281,7 @@ def write_market_brief(
         rls = r.get("retail_ratio")
         wls = r.get("whale_ratio")
         from signals.signal_engine import crowding_label
-        crowd = crowding_label(rls) if rls is not None else "N/A"
+        crowd = crowding_label(rls, d.get("retail_baseline")) if rls is not None else "N/A"
         if rls is not None:
             rls_str = f"{rls:.4f} ({crowd})" if crowd not in ("Balanced", "N/A") else f"{rls:.4f}"
         else:
@@ -347,8 +352,15 @@ def write_market_brief(
                     lines.append(f"- **Fear & Greed:** {m['fng']} ({m.get('fng_class', '')})")
             lines.append("")
     else:
-        lines.append("_No shock or contrarian signals fired this cycle._")
+        lines.append("_No contrarian alerts fired this cycle._")
     lines.append("")
+
+    if shock_context:
+        lines.append("## Market Shock Context (informational, not an alert)")
+        lines.append("")
+        for sh in shock_context:
+            lines.append(f"- **{sh.badge} {sh.direction}** (score {sh.score:.0f}) — {sh.reason}")
+        lines.append("")
 
     p.write_text("\n".join(lines), encoding="utf-8")
     log.info("Market brief written → %s", p)

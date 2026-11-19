@@ -2,7 +2,7 @@ name: Contrarian Market Intelligence Bot
 
 on:
   schedule:
-    - cron: '*/20 * * * *'
+    - cron: '17 * * * *'
     - cron: '30 13 * * 1-5'
     - cron: '30 14 * * 1-5'
   workflow_dispatch:
@@ -74,7 +74,7 @@ jobs:
             echo "Running standard scan..."
             python main.py
           else
-            echo "Running standard 20-minute contrarian scan..."
+            echo "Running standard hourly contrarian scan..."
             python main.py
           fi
 

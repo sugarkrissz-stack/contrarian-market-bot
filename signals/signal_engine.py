@@ -24,13 +24,27 @@ class Signal:
     trigger_type: str = "CONTRARIAN"  # "CONTRARIAN" | "SHOCK"
 
 
-def crowding_label(retail_ratio: float | None) -> str:
-    """Explicit label for retail L/S ratio crowding."""
+RETAIL_DEV_DEFAULT = 0.30
+
+
+def crowding_label(
+    retail_ratio: float | None,
+    baseline: float | None = None,
+    dev: float = RETAIL_DEV_DEFAULT,
+) -> str:
+    """Label retail L/S crowding relative to the ratio's own trailing median.
+
+    OKX's retail ratio sits near 2.7-3.0 nearly all the time, so an absolute cut-off like
+    "> 2.6" would call the market "crowded" most of the time.  Without a baseline there is
+    nothing to compare against, so the label stays neutral instead of guessing.
+    """
     if retail_ratio is None:
         return "N/A"
-    if retail_ratio > 2.6:
+    if baseline is None:
+        return "Balanced"
+    if retail_ratio >= baseline + dev:
         return "Longs Crowded / Squeeze Risk"
-    if retail_ratio < 0.75:
+    if retail_ratio <= baseline - dev:
         return "Shorts Crowded / Bounce Setup"
     return "Balanced"
 
@@ -51,8 +65,11 @@ def evaluate_market_shock(
     Triggers 1-of-1 immediately without waiting for 2-of-3 contrarian confluence.
     Conditions:
       a) Absolute price move >= 3.5% in 1h, >= 4.5% in 4h, OR >= 5.0% in 24h.
-      b) Open Interest drops by >= 5.0% over 1h to 4h (liquidation flush).
-      c) Panic capitulation combo: Fear & Greed Index < 15 AND 24h price change <= -4.5%.
+      b) Open Interest (contracts, not USD) drops by >= 5.0% over 1h to 4h (liquidation flush).
+      c) Panic capitulation: Fear & Greed < 15 AND 24h change <= -4.5% AND OI contracts <= -3.0%.
+
+    These describe a move that has ALREADY happened.  By default (market_shock.mode: context)
+    they are shown in the brief and attached to contrarian alerts as context, not sent as entries.
     """
     if not shock_data:
         return None
@@ -64,10 +81,10 @@ def evaluate_market_shock(
     p4 = shock_data.get("price_chg_4h_pct", 0.0)
     p24 = shock_data.get("price_chg_24h_pct", 0.0)
 
+    # Open interest is measured in CONTRACTS.  OI in USD falls whenever the price falls, even
+    # when nobody was liquidated, so it must not be used to detect a liquidation flush.
     oi1 = shock_data.get("oi_chg_1h_pct", 0.0)
     oi4 = shock_data.get("oi_chg_4h_pct", 0.0)
-    oi_usd1 = shock_data.get("oi_usd_chg_1h_pct", 0.0)
-    oi_usd4 = shock_data.get("oi_usd_chg_4h_pct", 0.0)
 
     fng_val = fng.get("value") if fng else None
     retail_ratio = ratios.get("retail_ratio") if ratios else None
@@ -80,6 +97,7 @@ def evaluate_market_shock(
     th_oi = -abs(shock_cfg.get("oi_flush_drop_pct", 5.0))
     th_fg = shock_cfg.get("capitulation_fg_max", 15)
     th_cap_p24 = -abs(shock_cfg.get("capitulation_24h_drop_pct", 4.5))
+    th_cap_oi = -abs(shock_cfg.get("capitulation_oi_drop_pct", 3.0))
 
     reasons: list[str] = []
     conds: list[str] = []
@@ -101,18 +119,31 @@ def evaluate_market_shock(
 
     # Condition b: OI drops >= 5.0% over 1h to 4h
     oi_drop_hit = False
-    worst_oi_drop = min(oi1, oi4, oi_usd1, oi_usd4)
-    if oi1 <= th_oi or oi4 <= th_oi or oi_usd1 <= th_oi or oi_usd4 <= th_oi:
+    worst_oi_drop = min(oi1, oi4)
+    if worst_oi_drop <= th_oi:
         oi_drop_hit = True
+        side = "longs flushed" if (p1 < 0 or p4 < 0) else "shorts squeezed"
         conds.append(f"oi_flush(worst_drop={worst_oi_drop:+.2f}% <= {th_oi:.1f}%)")
-        reasons.append(f"Open Interest dropped {worst_oi_drop:+.2f}% (liquidation flush >= {abs(th_oi):.1f}%)")
+        reasons.append(
+            f"Open Interest (contracts) dropped {worst_oi_drop:+.2f}% — liquidation flush, {side}"
+        )
 
-    # Condition c: Panic capitulation combo (F&G < 15 and 24h drop <= -4.5%)
+    # Condition c: Panic capitulation = extreme fear + a real 24h drop + leverage actually leaving.
+    # Fear & Greed alone sits below 15 for weeks, so it needs the OI confirmation to mean anything.
     cap_hit = False
-    if fng_val is not None and fng_val < th_fg and p24 <= th_cap_p24:
+    if (
+        fng_val is not None and fng_val < th_fg
+        and p24 <= th_cap_p24 and worst_oi_drop <= th_cap_oi
+    ):
         cap_hit = True
-        conds.append(f"panic_capitulation(fg={fng_val} < {th_fg}, 24h={p24:+.2f}% <= {th_cap_p24:+.1f}%)")
-        reasons.append(f"Panic capitulation: Fear & Greed {fng_val} < {th_fg} and 24h drop {p24:+.2f}%")
+        conds.append(
+            f"panic_capitulation(fg={fng_val} < {th_fg}, 24h={p24:+.2f}% <= {th_cap_p24:+.1f}%, "
+            f"OI {worst_oi_drop:+.2f}% <= {th_cap_oi:.1f}%)"
+        )
+        reasons.append(
+            f"Panic capitulation: Fear & Greed {fng_val} < {th_fg}, 24h drop {p24:+.2f}%, "
+            f"OI contracts {worst_oi_drop:+.2f}%"
+        )
 
     if not (price_shock_hit or oi_drop_hit or cap_hit):
         return None
@@ -199,6 +230,7 @@ def score_crypto(
     cfg: dict[str, Any] | None = None,
     basis_baseline: float | None = None,
     shock_data: dict[str, Any] | None = None,
+    retail_baseline: float | None = None,
 ) -> Signal | None:
     """Evaluate a single symbol against contrarian long and short gates.
 
@@ -207,7 +239,9 @@ def score_crypto(
     Thresholds:
       - Fear & Greed Index: < 20 (Extreme Fear) or > 80 (Extreme Greed)
       - Funding Rate: < -0.00005 (-0.005%) or > 0.00025 (+0.025%)
-      - Long/Short Ratio: > 2.60 (Longs Crowded / Squeeze Risk) or < 0.75 (Shorts Crowded / Bounce Setup)
+      - Retail Long/Short Ratio: judged against its own trailing median (retail_baseline) because
+        the OKX retail ratio sits near 2.7-3.0 almost all the time; a fixed "> 2.60" is true ~75%
+        of the time.  Without a baseline the retail arm is skipped (never guessed).
     """
     if not funding:
         return None
@@ -230,6 +264,9 @@ def score_crypto(
             basis = raw_basis - basis_baseline
     retail_ratio = ratios.get("retail_ratio") if ratios else None
     whale_ratio = ratios.get("whale_ratio") if ratios else None
+    rb_cfg = cfg.get("retail_baseline", {})
+    use_retail_baseline = bool(rb_cfg.get("enabled", True))
+    retail_dev = float(rb_cfg.get("dev", RETAIL_DEV_DEFAULT))
     oi_delta = oi.get("oi_delta_4h_pct", 0.0) if oi else None
     if (oi_delta is None or oi_delta == 0.0) and shock_data and shock_data.get("oi_chg_4h_pct") is not None:
         oi_delta = shock_data.get("oi_chg_4h_pct")
@@ -241,8 +278,11 @@ def score_crypto(
         "basis_pct": round(raw_basis, 4),
         "basis_baseline": round(basis_baseline, 4) if basis_baseline is not None else None,
         "retail_ls": round(retail_ratio, 4) if retail_ratio else None,
+        "retail_ls_baseline": round(retail_baseline, 4) if retail_baseline is not None else None,
         "whale_ls": round(whale_ratio, 4) if whale_ratio else None,
-        "crowding_label": crowding_label(retail_ratio),
+        "crowding_label": crowding_label(
+            retail_ratio, retail_baseline if use_retail_baseline else None, retail_dev
+        ),
         "oi_delta_4h": round(oi_delta, 2) if oi_delta is not None else None,
         "fng": fng_value,
         "fng_class": fng.get("classification") if fng else None,
@@ -283,15 +323,27 @@ def score_crypto(
         long_conds.append(f"A_oi_flush({oi_delta:.2f}%<=-{oi_drop_thresh:.2f}%)")
         long_score += 30
 
-    # Gate B: Retail vs Whale Divergence (Retail < 0.75 [Shorts Crowded / Bounce Setup] OR Whale - Retail >= 0.35)
+    # Gate B: Retail vs Whale Divergence
+    #   retail well BELOW its own 7d median (Shorts Crowded / Bounce Setup)  OR  Whale - Retail >= 0.35
     retail_ls_max = long_cfg.get("retail_ls_max", 0.75)
     whale_diff_min = long_cfg.get("whale_minus_retail_min", 0.35)
 
     if retail_ratio is not None:
-        if retail_ratio < retail_ls_max:
-            long_conds.append(
+        retail_low_hit = False
+        if use_retail_baseline:
+            if retail_baseline is not None and retail_ratio <= retail_baseline - retail_dev:
+                retail_low_hit = True
+                retail_low_txt = (
+                    f"B_retail_ls_low({retail_ratio:.4f} vs {retail_baseline:.4f} median, "
+                    f"{retail_ratio - retail_baseline:+.2f}<=-{retail_dev:.2f}, Shorts Crowded / Bounce Setup)"
+                )
+        elif retail_ratio < retail_ls_max:
+            retail_low_hit = True
+            retail_low_txt = (
                 f"B_retail_ls_low({retail_ratio:.4f}<{retail_ls_max:.2f}, Shorts Crowded / Bounce Setup)"
             )
+        if retail_low_hit:
+            long_conds.append(retail_low_txt)
             long_score += 35
         elif whale_ratio is not None and (whale_ratio - retail_ratio) >= whale_diff_min:
             long_conds.append(f"B_whale_lead_divergence({whale_ratio - retail_ratio:.2f}>={whale_diff_min:.2f})")
@@ -334,15 +386,27 @@ def score_crypto(
         short_conds.append(f"A_oi_expansion({oi_delta:.2f}%>={oi_jump_thresh:.2f}%)")
         short_score += 30
 
-    # Gate B: Retail Chasing (Retail > 2.60 [Longs Crowded / Squeeze Risk] OR Retail - Whale >= 0.80)
+    # Gate B: Retail Chasing
+    #   retail well ABOVE its own 7d median (Longs Crowded / Squeeze Risk)  OR  Retail - Whale >= 0.80
     retail_ls_min = short_cfg.get("retail_ls_min", 2.60)
     retail_diff_min = short_cfg.get("retail_minus_whale_min", 0.80)
 
     if retail_ratio is not None:
-        if retail_ratio > retail_ls_min:
-            short_conds.append(
+        retail_high_hit = False
+        if use_retail_baseline:
+            if retail_baseline is not None and retail_ratio >= retail_baseline + retail_dev:
+                retail_high_hit = True
+                retail_high_txt = (
+                    f"B_retail_chasing({retail_ratio:.4f} vs {retail_baseline:.4f} median, "
+                    f"{retail_ratio - retail_baseline:+.2f}>=+{retail_dev:.2f}, Longs Crowded / Squeeze Risk)"
+                )
+        elif retail_ratio > retail_ls_min:
+            retail_high_hit = True
+            retail_high_txt = (
                 f"B_retail_chasing({retail_ratio:.4f}>{retail_ls_min:.2f}, Longs Crowded / Squeeze Risk)"
             )
+        if retail_high_hit:
+            short_conds.append(retail_high_txt)
             short_score += 35
         elif whale_ratio is not None and (retail_ratio - whale_ratio) >= retail_diff_min:
             short_conds.append(f"B_retail_whale_divergence({retail_ratio - whale_ratio:.2f}>={retail_diff_min:.2f})")
@@ -508,6 +572,37 @@ def dedupe_signals(signals: list[Signal]) -> list[Signal]:
     return [best[key] for key in order]
 
 
+def attach_shock_context(candidates: list[Signal], shock_signals: list[Signal]) -> int:
+    """Append recent market-shock facts to contrarian alerts on the same underlying asset.
+
+    A shock (sharp move / real OI flush) is not an entry on its own, but next to a contrarian
+    setup it is useful evidence ("capitulation just happened").  Returns how many alerts were
+    enriched.
+    """
+    by_asset: dict[str, Signal] = {}
+    for sh in shock_signals:
+        cur = by_asset.get(base_asset(sh.symbol))
+        if cur is None or sh.score > cur.score:
+            by_asset[base_asset(sh.symbol)] = sh
+    n = 0
+    for sig in candidates:
+        if sig.source != "crypto":
+            continue
+        sh = by_asset.get(base_asset(sig.symbol))
+        if sh is None:
+            continue
+        sig.reason = f"{sig.reason} | Shock context: {sh.direction} — {sh.reason}"
+        sig.metrics["shock_context"] = sh.direction
+        n += 1
+    return n
+
+
+def shock_mode(cfg: dict[str, Any]) -> str:
+    """market_shock.mode: 'context' (default), 'alert' or 'off'."""
+    mode = str(cfg.get("market_shock", {}).get("mode", "context")).lower()
+    return mode if mode in ("context", "alert", "off") else "context"
+
+
 # ─── Cooldown and Hard Cap Check ───
 
 
@@ -530,7 +625,11 @@ def passes_cooldown(signal: Signal, cfg: dict[str, Any]) -> bool:
     # ── Market Shock Cooldown Check (3h separate cooldown) ──
     if signal.source == "shock" or signal.trigger_type == "SHOCK":
         shock_cfg = cfg.get("market_shock", {})
-        hours = shock_cfg.get("cooldown_hours", 3)
+        hours = shock_cfg.get("cooldown_hours", 6)
+        shock_cap = shock_cfg.get("max_alerts_per_day", 1)
+        if db.count_shock_alerts_last_24h() >= shock_cap:
+            log.info("Market Shock alert suppressed by its own cap (%d/24h): %s", shock_cap, signal.symbol)
+            return False
         check_symbols = sibling_symbols(signal.symbol, cfg)
         for s in check_symbols:
             if db.check_shock_cooldown(s, cooldown_hours=hours):
@@ -545,6 +644,18 @@ def passes_cooldown(signal: Signal, cfg: dict[str, Any]) -> bool:
     cd_cfg = cfg.get("cooldown", {})
     hours = cd_cfg.get("hours", 12)
     esc_pct = cd_cfg.get("escalation_pct", 40)
+
+    # Flip-flop guard: no LONG within the cooldown of a SHORT on the same asset (or the reverse).
+    # An "entry" that reverses a few hours after the previous one is noise, not a swing signal.
+    if signal.source == "crypto" and signal.direction in ("LONG", "SHORT"):
+        opposite = "SHORT" if signal.direction == "LONG" else "LONG"
+        for s_ in sibling_symbols(signal.symbol, cfg):
+            if db.recent_alert_exists("crypto", s_, opposite, hours):
+                log.info(
+                    "Flip-flop suppressed: %s %s while a %s alert on %s is < %sh old",
+                    signal.symbol, signal.direction, opposite, s_, hours,
+                )
+                return False
 
     # For crypto, the cooldown covers every pair on the same underlying, so an alert for
     # BTCUSDT also holds back BTCUSDC (and the other way round).
