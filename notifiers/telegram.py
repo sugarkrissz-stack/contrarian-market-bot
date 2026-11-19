@@ -79,7 +79,11 @@ def _post_message(text: str, parse_mode: str | None, timeout: int = 10) -> bool:
 
 def send_alert(signal: Signal, dry_run: bool = False) -> bool:
     """Send a formatted Telegram alert.  Returns True only if it was delivered."""
-    text = _format_signal(signal)
+    try:
+        text = _format_signal(signal)
+    except Exception as e:
+        log.error("Failed to format signal alert: %s", e)
+        return False
 
     if dry_run:
         log.info("[DRY-RUN] Would send Telegram alert:\n%s", text)
@@ -253,26 +257,38 @@ def write_market_brief(
         r = d.get("ratios") or {}
         sh = d.get("shock") or {}
 
-        p1_str = f"{sh['price_chg_1h_pct']:+.2f}%" if "price_chg_1h_pct" in sh else "—"
-        p4_str = f"{sh['price_chg_4h_pct']:+.2f}%" if "price_chg_4h_pct" in sh else "—"
-        p24_str = f"{sh['price_chg_24h_pct']:+.2f}%" if "price_chg_24h_pct" in sh else "—"
+        p1_val = sh.get("price_chg_1h_pct")
+        p1_str = f"{p1_val:+.2f}%" if p1_val is not None else "—"
+        p4_val = sh.get("price_chg_4h_pct")
+        p4_str = f"{p4_val:+.2f}%" if p4_val is not None else "—"
+        p24_val = sh.get("price_chg_24h_pct")
+        p24_str = f"{p24_val:+.2f}%" if p24_val is not None else "—"
 
-        oi1_str = f"{sh['oi_chg_1h_pct']:+.2f}%" if "oi_chg_1h_pct" in sh else "—"
-        oi4_val = sh.get("oi_chg_4h_pct", o.get("oi_delta_4h_pct"))
+        oi1_val = sh.get("oi_chg_1h_pct")
+        oi1_str = f"{oi1_val:+.2f}%" if oi1_val is not None else "—"
+        oi4_val = sh.get("oi_chg_4h_pct") if sh.get("oi_chg_4h_pct") is not None else o.get("oi_delta_4h_pct")
         oi4_str = f"{oi4_val:+.2f}%" if oi4_val is not None else "—"
 
-        fr = f.get("funding_rate", 0.0)
-        apr = f.get("annualized_apr", 0.0)
+        fr = f.get("funding_rate") or 0.0
+        apr = f.get("annualized_apr") or 0.0
         funding_str = f"{fr*100:+.4f}% / {apr:+.2f}%" if fr else f"{apr:+.2f}% APR"
 
-        rls = r.get("retail_ratio", 0)
+        rls = r.get("retail_ratio")
+        wls = r.get("whale_ratio")
         from signals.signal_engine import crowding_label
-        crowd = crowding_label(rls)
-        rls_str = f"{rls:.4f} ({crowd})" if crowd != "Balanced" else f"{rls:.4f}"
+        crowd = crowding_label(rls) if rls is not None else "N/A"
+        if rls is not None:
+            rls_str = f"{rls:.4f} ({crowd})" if crowd not in ("Balanced", "N/A") else f"{rls:.4f}"
+        else:
+            rls_str = "—"
+        wls_str = f"{wls:.4f}" if wls is not None else "—"
+
+        mark_px = f.get("mark_price")
+        mark_str = f"${mark_px:,.2f}" if mark_px is not None else "—"
 
         lines.append(
             f"| {sym} "
-            f"| ${f.get('mark_price', 0):,.2f} "
+            f"| {mark_str} "
             f"| {p1_str} "
             f"| {p4_str} "
             f"| {p24_str} "
@@ -280,7 +296,7 @@ def write_market_brief(
             f"| {oi4_str} "
             f"| {funding_str} "
             f"| {rls_str} "
-            f"| {r.get('whale_ratio', 0):.4f} |"
+            f"| {wls_str} |"
         )
     lines.append("")
 
@@ -312,15 +328,15 @@ def write_market_brief(
             m = s.metrics
             if s.source in ("crypto", "shock"):
                 p_parts = []
-                for k in ("price_chg_1h", "price_chg_4h", "price_chg_24h"):
+                for k, lbl in [("price_chg_1h", "1h"), ("price_chg_4h", "4h"), ("price_chg_24h", "24h")]:
                     if m.get(k) is not None:
-                        p_parts.append(f"{k[-3:]} Δ: {m[k]:+.2f}%")
+                        p_parts.append(f"{lbl} Δ: {m[k]:+.2f}%")
                 if p_parts:
                     lines.append(f"- **Price Moves:** {' | '.join(p_parts)}")
                 oi_parts = []
-                for k in ("oi_delta_1h", "oi_delta_4h"):
+                for k, lbl in [("oi_delta_1h", "1h"), ("oi_delta_4h", "4h")]:
                     if m.get(k) is not None:
-                        oi_parts.append(f"{k[-3:]} Δ: {m[k]:+.2f}%")
+                        oi_parts.append(f"{lbl} Δ: {m[k]:+.2f}%")
                 if oi_parts:
                     lines.append(f"- **Open Interest Δ:** {' | '.join(oi_parts)}")
                 if m.get("funding_rate") is not None and m.get("funding_apr") is not None:

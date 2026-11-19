@@ -94,11 +94,10 @@ def fetch_filings(
             try:
                 f_date = datetime.strptime(filed_date, "%Y-%m-%d").date()
                 if (now_date - f_date).days > lookback_days:
-                    # Submissions are reverse-chronological; stop when outside lookback window
-                    break
+                    continue
             except ValueError:
                 if filed_date < cutoff_date:
-                    break
+                    continue
 
         if form_type not in ("4", "13F-HR"):
             continue

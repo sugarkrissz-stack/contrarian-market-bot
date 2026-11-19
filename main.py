@@ -61,6 +61,14 @@ def run(cfg: dict, dry_run: bool = False) -> None:
     # ── 1. Collect Fear & Greed ──
     log.info("━━━ Collecting Fear & Greed ━━━")
     fng = sentiment.fetch()
+    if not fng:
+        cached_fng = db.latest_fng()
+        if cached_fng:
+            log.info(
+                "sentiment.fetch() returned None — using cached Fear & Greed from DB: %s (%s)",
+                cached_fng.get("value"), cached_fng.get("classification"),
+            )
+            fng = cached_fng
 
     # ── 2. Collect Perpetual Futures (Binance, OKX fallback) ──
     log.info("━━━ Collecting Perpetual Futures Data ━━━")
@@ -192,6 +200,14 @@ def run_daily_open_brief(cfg: dict, dry_run: bool = False) -> None:
 
     log.info("• Fetching Fear & Greed Index...")
     fng = sentiment.fetch()
+    if not fng:
+        cached_fng = db.latest_fng()
+        if cached_fng:
+            log.info(
+                "sentiment.fetch() returned None — using cached Fear & Greed from DB: %s (%s)",
+                cached_fng.get("value"), cached_fng.get("classification"),
+            )
+            fng = cached_fng
 
     log.info("• Fetching Crypto Futures Positioning...")
     all_symbols = cfg.get("symbols", {}).get("primary", []) + cfg.get("symbols", {}).get("secondary", [])

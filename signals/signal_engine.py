@@ -231,6 +231,8 @@ def score_crypto(
     retail_ratio = ratios.get("retail_ratio") if ratios else None
     whale_ratio = ratios.get("whale_ratio") if ratios else None
     oi_delta = oi.get("oi_delta_4h_pct", 0.0) if oi else None
+    if (oi_delta is None or oi_delta == 0.0) and shock_data and shock_data.get("oi_chg_4h_pct") is not None:
+        oi_delta = shock_data.get("oi_chg_4h_pct")
     fng_value = fng.get("value") if fng else None
 
     metrics = {
@@ -404,7 +406,7 @@ def filter_form4(
     sale_10b51_min = f4cfg.get("sale_10b51_min_value", 2_000_000)
 
     code = (filing.get("txn_code") or "").upper().strip()
-    total = filing.get("total_value") or 0
+    total = abs(filing.get("total_value") or 0)
     is_10b51 = bool(filing.get("is_10b51"))
     ticker = filing.get("ticker", "?")
 
@@ -486,24 +488,24 @@ def dedupe_signals(signals: list[Signal]) -> list[Signal]:
     """Keep one signal per (underlying asset, direction/type): the highest score.
 
     BTCUSDT and BTCUSDC describe the same market; alerting both used up the daily cap or
-    sent duplicate shock alerts. Ties keep the first one in input order. Non-crypto/non-shock
-    pass through.
+    sent duplicate shock alerts. Ties keep the first one in input order. For SEC filings,
+    keep the highest-score filing per (ticker, direction).
     """
     best: dict[tuple[str, str], Signal] = {}
-    order: list[Signal | tuple[str, str]] = []
+    order: list[tuple[str, str]] = []
     for sig in signals:
         if sig.source == "sec":
-            order.append(sig)
-            continue
-        # Crypto and Shock signals keyed by underlying asset
-        action_key = "SHOCK" if (sig.source == "shock" or sig.trigger_type == "SHOCK") else sig.direction
-        key = (base_asset(sig.symbol), action_key)
+            key = (sig.symbol, sig.direction)
+        else:
+            action_key = "SHOCK" if (sig.source == "shock" or sig.trigger_type == "SHOCK") else sig.direction
+            key = (base_asset(sig.symbol), action_key)
+
         if key not in best:
             best[key] = sig
             order.append(key)
         elif sig.score > best[key].score:
             best[key] = sig
-    return [best[item] if isinstance(item, tuple) else item for item in order]
+    return [best[key] for key in order]
 
 
 # ─── Cooldown and Hard Cap Check ───

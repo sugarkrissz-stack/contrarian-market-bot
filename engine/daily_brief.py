@@ -32,14 +32,14 @@ def generate_directional_outlook(
     btc_data = crypto.get("BTCUSDT") or crypto.get("BTCUSDC") or {}
     eth_data = crypto.get("ETHUSDT") or crypto.get("ETHUSDC") or {}
 
-    btc_fund = (btc_data.get("funding") or {}).get("annualized_apr", 0.0)
-    eth_fund = (eth_data.get("funding") or {}).get("annualized_apr", 0.0)
-    btc_oi_delta = (btc_data.get("oi") or {}).get("oi_delta_4h_pct", 0.0)
-    eth_oi_delta = (eth_data.get("oi") or {}).get("oi_delta_4h_pct", 0.0)
-    btc_retail = (btc_data.get("ratios") or {}).get("retail_ratio", 1.5)
-    btc_whale = (btc_data.get("ratios") or {}).get("whale_ratio", 1.0)
-    eth_retail = (eth_data.get("ratios") or {}).get("retail_ratio", 1.5)
-    eth_whale = (eth_data.get("ratios") or {}).get("whale_ratio", 1.0)
+    btc_fund = (btc_data.get("funding") or {}).get("annualized_apr") or 0.0
+    eth_fund = (eth_data.get("funding") or {}).get("annualized_apr") or 0.0
+    btc_oi_delta = (btc_data.get("oi") or {}).get("oi_delta_4h_pct") or 0.0
+    eth_oi_delta = (eth_data.get("oi") or {}).get("oi_delta_4h_pct") or 0.0
+    btc_retail = (btc_data.get("ratios") or {}).get("retail_ratio") or 1.5
+    btc_whale = (btc_data.get("ratios") or {}).get("whale_ratio") or 1.0
+    eth_retail = (eth_data.get("ratios") or {}).get("retail_ratio") or 1.5
+    eth_whale = (eth_data.get("ratios") or {}).get("whale_ratio") or 1.0
 
     avg_fund = (btc_fund + eth_fund) / 2.0
     avg_oi_delta = (btc_oi_delta + eth_oi_delta) / 2.0
@@ -93,9 +93,14 @@ def generate_directional_outlook(
         bullets.append(
             f"Futures indicate resilient risk appetite: S&P Futures {es_chg:+.2f}%, Nasdaq {nq_chg:+.2f}%, with DXY stable at {dxy.get('price', 100):.2f}."
         )
-        bullets.append(
-            f"Recent OI flush ({avg_oi_delta:+.2f}% 4h) cleaned out weak leverage, paving the way for cash-driven opening demand."
-        )
+        if avg_oi_delta <= -1.5:
+            bullets.append(
+                f"Recent OI flush ({avg_oi_delta:+.2f}% 4h) cleaned out weak leverage, paving the way for cash-driven opening demand."
+            )
+        else:
+            bullets.append(
+                f"Derivatives leverage is stabilizing ({avg_oi_delta:+.2f}% 4h OI delta), reducing downside cascade risk alongside depressed sentiment."
+            )
 
     # Rule 4: Bearish Continuation
     else:
@@ -155,11 +160,21 @@ def build_daily_open_brief(
     bf = btc.get("funding") or {}
     bo = btc.get("oi") or {}
     br = btc.get("ratios") or {}
+    btc_mark = bf.get("mark_price")
+    btc_mark_str = f"${btc_mark:,.0f}" if btc_mark is not None else "N/A"
+    btc_apr = bf.get("annualized_apr")
+    btc_apr_str = f"{btc_apr:+.2f}%" if btc_apr is not None else "N/A"
+    btc_oi = bo.get("oi_delta_4h_pct")
+    btc_oi_str = f"{btc_oi:+.2f}%" if btc_oi is not None else "N/A"
+    btc_ret = br.get("retail_ratio")
+    btc_ret_str = f"{btc_ret:.2f}" if btc_ret is not None else "N/A"
+    btc_wh = br.get("whale_ratio")
+    btc_wh_str = f"{btc_wh:.2f}" if btc_wh is not None else "N/A"
     lines.append(
-        f"  • *BTC:* `${bf.get('mark_price', 0):,.0f}` | "
-        f"APR: `{bf.get('annualized_apr', 0):+.2f}%` | "
-        f"4h OI Δ: `{bo.get('oi_delta_4h_pct', 0):+.2f}%` | "
-        f"Retail: `{br.get('retail_ratio', 0):.2f}` | Whale: `{br.get('whale_ratio', 0):.2f}`"
+        f"  • *BTC:* `{btc_mark_str}` | "
+        f"APR: `{btc_apr_str}` | "
+        f"4h OI Δ: `{btc_oi_str}` | "
+        f"Retail: `{btc_ret_str}` | Whale: `{btc_wh_str}`"
     )
 
     # ETH summary
@@ -167,11 +182,21 @@ def build_daily_open_brief(
     ef = eth.get("funding") or {}
     eo = eth.get("oi") or {}
     er = eth.get("ratios") or {}
+    eth_mark = ef.get("mark_price")
+    eth_mark_str = f"${eth_mark:,.2f}" if eth_mark is not None else "N/A"
+    eth_apr = ef.get("annualized_apr")
+    eth_apr_str = f"{eth_apr:+.2f}%" if eth_apr is not None else "N/A"
+    eth_oi = eo.get("oi_delta_4h_pct")
+    eth_oi_str = f"{eth_oi:+.2f}%" if eth_oi is not None else "N/A"
+    eth_ret = er.get("retail_ratio")
+    eth_ret_str = f"{eth_ret:.2f}" if eth_ret is not None else "N/A"
+    eth_wh = er.get("whale_ratio")
+    eth_wh_str = f"{eth_wh:.2f}" if eth_wh is not None else "N/A"
     lines.append(
-        f"  • *ETH:* `${ef.get('mark_price', 0):,.2f}` | "
-        f"APR: `{ef.get('annualized_apr', 0):+.2f}%` | "
-        f"4h OI Δ: `{eo.get('oi_delta_4h_pct', 0):+.2f}%` | "
-        f"Retail: `{er.get('retail_ratio', 0):.2f}` | Whale: `{er.get('whale_ratio', 0):.2f}`"
+        f"  • *ETH:* `{eth_mark_str}` | "
+        f"APR: `{eth_apr_str}` | "
+        f"4h OI Δ: `{eth_oi_str}` | "
+        f"Retail: `{eth_ret_str}` | Whale: `{eth_wh_str}`"
     )
 
     lines.append("")

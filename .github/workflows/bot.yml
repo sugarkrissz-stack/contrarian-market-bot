@@ -60,13 +60,17 @@ jobs:
           elif [ "${{ inputs.daily_brief }}" = "true" ]; then
             echo "Workflow dispatch requested daily open brief. Running Daily Open Brief..."
             python main.py --daily-open-brief
+            echo "Running standard scan..."
+            python main.py
           elif [ "$NY_DOW" -le 5 ] && [ "$NY_MINS" -ge 560 ] && [ "$NY_MINS" -le 690 ] && [ "$LAST_BRIEF" != "$NY_DATE" ]; then
             # 09:20–11:30 ET on weekdays, once per day. GitHub starts scheduled runs late
             # or skips them, so a narrow window used to miss the brief entirely.
             echo "Open brief not yet sent for $NY_DATE and inside 09:20–11:30 ET window. Running Daily Open Brief..."
             python main.py --daily-open-brief
+            echo "Running standard scan..."
+            python main.py
           else
-            echo "Running standard hourly contrarian scan..."
+            echo "Running standard 20-minute contrarian scan..."
             python main.py
           fi
 

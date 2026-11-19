@@ -85,13 +85,21 @@ def fetch_recent_market_shock_data(symbol: str) -> dict[str, Any] | None:
     curr_price = float(candles[0][4])
     price_1h = float(candles[1][4]) if len(candles) > 1 else curr_price
     price_4h = float(candles[4][4]) if len(candles) > 4 else price_1h
-    # 24 hours ago: index 24 (or oldest available if < 25)
-    idx_24h = min(24, len(candles) - 1)
-    price_24h = float(candles[idx_24h][4])
+
+    # 24 hours ago: requires at least 24 bars and ~20+ hours timestamp span
+    price_24h = curr_price
+    price_chg_24h = 0.0
+    if len(candles) >= 24:
+        idx_24h = min(24, len(candles) - 1)
+        curr_ts = int(candles[0][0])
+        past_ts = int(candles[idx_24h][0])
+        hours_diff = (curr_ts - past_ts) / (3600 * 1000)
+        if hours_diff >= 20:
+            price_24h = float(candles[idx_24h][4])
+            price_chg_24h = ((curr_price - price_24h) / price_24h * 100) if price_24h else 0.0
 
     price_chg_1h = ((curr_price - price_1h) / price_1h * 100) if price_1h else 0.0
     price_chg_4h = ((curr_price - price_4h) / price_4h * 100) if price_4h else 0.0
-    price_chg_24h = ((curr_price - price_24h) / price_24h * 100) if price_24h else 0.0
 
     # 2. Fetch 1H Open Interest History (up to 6 bars)
     oi_chg_1h = 0.0
