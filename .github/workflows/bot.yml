@@ -87,5 +87,16 @@ jobs:
             echo "No changes to market intelligence artifacts."
           else
             git commit -m "chore: automated market intelligence update [skip ci]"
-            git push origin main
+            # main can move while the bot runs (a merged PR, a manual run). Rebase onto it and
+            # retry instead of failing the whole run and losing this hour's snapshot.
+            for i in 1 2 3; do
+              if git pull --rebase origin main && git push origin main; then
+                exit 0
+              fi
+              git rebase --abort 2>/dev/null || true
+              echo "Push attempt $i failed, retrying..."
+              sleep $((i * 5))
+            done
+            echo "Could not push after 3 attempts"
+            exit 1
           fi
