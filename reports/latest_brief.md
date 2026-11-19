@@ -1,4 +1,4 @@
-# Contrarian Market Brief — 2026-11-19 00:29 UTC
+# Contrarian Market Brief — 2026-11-19 01:54 UTC
 
 ## Macro Sentiment
 - Fear & Greed Index: **10** (Extreme Fear)
@@ -10,10 +10,10 @@ _Data source this run: OKX (Binance blocked from this server)_
 
 | Symbol | Mark Price | 1h Price Δ | 4h Price Δ | 24h Price Δ | 1h OI Δ | 4h OI Δ | Funding (8h / APR) | Retail L/S (Crowding) | Whale L/S |
 |--------|-----------|------------|------------|-------------|---------|---------|---------------------|-----------------------|-----------|
-| BTCUSDC | $62,843.80 | -0.29% | +0.39% | -2.96% | -0.32% | -2.88% | -0.0018% / -1.92% | 3.4600 (Longs Crowded / Squeeze Risk) | 0.8771 |
-| BTCUSDT | $62,844.50 | -0.29% | +0.39% | -2.96% | -0.32% | -2.88% | -0.0018% / -1.92% | 3.4700 (Longs Crowded / Squeeze Risk) | 0.8771 |
-| ETHUSDC | $1,777.33 | +0.04% | +1.35% | -2.35% | -0.12% | -0.45% | +0.0007% / +0.75% | 3.4500 (Longs Crowded / Squeeze Risk) | 0.8534 |
-| ETHUSDT | $1,777.35 | +0.04% | +1.35% | -2.35% | -0.12% | -0.45% | +0.0007% / +0.75% | 3.4400 (Longs Crowded / Squeeze Risk) | 0.8534 |
+| BTCUSDC | $62,638.50 | -0.79% | +0.55% | -2.52% | -0.06% | -0.63% | -0.0029% / -3.19% | 3.4700 (Longs Crowded / Squeeze Risk) | 0.8772 |
+| BTCUSDT | $62,645.50 | -0.79% | +0.55% | -2.52% | -0.06% | -0.63% | -0.0029% / -3.19% | 3.4700 (Longs Crowded / Squeeze Risk) | 0.8772 |
+| ETHUSDC | $1,773.44 | -0.60% | +0.53% | -1.59% | -0.17% | -0.64% | +0.0019% / +2.12% | 3.3900 (Longs Crowded / Squeeze Risk) | 0.8553 |
+| ETHUSDT | $1,773.52 | -0.60% | +0.53% | -1.59% | -0.17% | -0.64% | +0.0019% / +2.12% | 3.3900 (Longs Crowded / Squeeze Risk) | 0.8553 |
 
 ## Alerts Fired: 0
 
