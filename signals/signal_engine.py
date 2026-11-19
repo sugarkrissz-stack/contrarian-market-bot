@@ -514,11 +514,20 @@ def dedupe_signals(signals: list[Signal]) -> list[Signal]:
 def passes_cooldown(signal: Signal, cfg: dict[str, Any]) -> bool:
     """Return True if signal passes cooldown and cap rules.
 
-    Market Shock alerts use a separate 3-hour per-symbol cooldown and are NEVER blocked
-    by the 12-hour contrarian cooldown or daily contrarian cap.
-    Standard contrarian & SEC alerts pass through the 24h daily cap and 12h per-symbol cooldown.
+    Every alert source shares the rolling 24-hour global cap. Market Shock alerts
+    additionally use their separate 3-hour per-symbol cooldown, while standard
+    contrarian and SEC alerts use the configured per-symbol cooldown.
     """
-    # ── Market Shock Cooldown Check (3h separate cooldown, bypasses daily cap) ──
+    # ── Global cap: shock, crypto, and SEC alerts all consume the same budget ──
+    if not check_daily_alert_cap(cfg):
+        max_alerts = cfg.get("max_alerts_per_day", 2)
+        log.info(
+            "Alert suppressed by global 24h cap: %s %s %s (cap=%d)",
+            signal.source, signal.symbol, signal.direction, max_alerts,
+        )
+        return False
+
+    # ── Market Shock Cooldown Check (3h separate cooldown) ──
     if signal.source == "shock" or signal.trigger_type == "SHOCK":
         shock_cfg = cfg.get("market_shock", {})
         hours = shock_cfg.get("cooldown_hours", 3)
@@ -532,16 +541,7 @@ def passes_cooldown(signal: Signal, cfg: dict[str, Any]) -> bool:
                 return False
         return True
 
-    # ── Standard Contrarian & SEC: Gate 1: Check 24-hour hard cap (max_alerts_per_day) ──
-    if not check_daily_alert_cap(cfg):
-        max_alerts = cfg.get("max_alerts_per_day", 2)
-        log.info(
-            "Alert suppressed by 24h hard cap: %s %s %s (cap=%d)",
-            signal.source, signal.symbol, signal.direction, max_alerts,
-        )
-        return False
-
-    # ── Standard Contrarian & SEC: Gate 2: 12h per-symbol cooldown ──
+    # ── Standard Contrarian & SEC: 12h per-symbol cooldown ──
     cd_cfg = cfg.get("cooldown", {})
     hours = cd_cfg.get("hours", 12)
     esc_pct = cd_cfg.get("escalation_pct", 40)

@@ -161,6 +161,7 @@ def run(cfg: dict, dry_run: bool = False) -> None:
     candidates = dedupe_signals(candidates)
     if len(candidates) < n_before:
         log.info("De-duplicated %d signal(s) on the same underlying asset", n_before - len(candidates))
+    candidates.sort(key=lambda sig: sig.score, reverse=True)
     for sig in candidates:
         if not passes_cooldown(sig, cfg):
             log.info("⏳ Cooldown/cap: %s %s %s", sig.source, sig.symbol, sig.direction)

@@ -14,12 +14,11 @@ usdc_to_usdt_fallback:
   ETHUSDC: ETHUSDT
 
 # ─── Global Alert Limits & Deduplication ───
-max_alerts_per_day: 2            # hard cap over the last 24 hours (checked via alerts_log)
+max_alerts_per_day: 2            # hard cap across ALL alert sources over the last 24 hours
 
 cooldown:
   hours: 12                      # 12h per-symbol cooldown
   escalation_pct: 40             # re-alert only if score jumps >= 40%
-  max_alerts_per_day: 2          # fallback reference
 
 # ─── Contrarian Long Thresholds (Retail Fear / Short Squeeze Setup) ───
 contrarian_long:

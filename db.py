@@ -160,15 +160,11 @@ def record_alert(source: str, symbol: str, signal_type: str, score: float) -> No
 
 
 def count_alerts_last_24h() -> int:
-    """Return number of standard contrarian alerts logged in the last 24 hours.
-
-    Excludes Market Shock alerts so shock alerts never burn the daily contrarian cap.
-    """
+    """Return number of alerts from every source logged in the last 24 hours."""
     with _connect() as conn:
         cur = conn.execute(
             """SELECT COUNT(*) FROM alerts_log
-               WHERE source != 'shock'
-                 AND alerted_at > datetime('now', '-24 hours')"""
+               WHERE alerted_at > datetime('now', '-24 hours')"""
         )
         row = cur.fetchone()
         return int(row[0]) if row else 0
