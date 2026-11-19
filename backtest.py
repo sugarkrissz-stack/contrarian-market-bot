@@ -393,7 +393,7 @@ def _table(
         ev = summarize(candles, events, h, side, stops)
         lines.append(_fmt_row(f"{h}{unit} after", ev, stops, key_stop))
         base = summarize(candles, all_idx, h, side, stops)
-        lines.append(_fmt_row(f"{h}{unit} random-day baseline", base, stops, key_stop))
+        lines.append(_fmt_row(f"{h}{unit} random-{'day' if unit == 'd' else 'hour'} baseline", base, stops, key_stop))
     lines.append("")
     return lines
 
