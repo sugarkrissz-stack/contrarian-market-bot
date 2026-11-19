@@ -170,6 +170,56 @@ def count_alerts_last_24h() -> int:
         return int(row[0]) if row else 0
 
 
+def count_shock_alerts_last_24h() -> int:
+    """Number of Market Shock alerts delivered in the last 24 hours (own cap, separate from contrarian)."""
+    with _connect() as conn:
+        cur = conn.execute(
+            """SELECT COUNT(*) FROM alerts_log
+               WHERE source = 'shock'
+                 AND alerted_at > datetime('now', '-24 hours')"""
+        )
+        row = cur.fetchone()
+        return int(row[0]) if row else 0
+
+
+def recent_alert_exists(source: str, symbol: str, signal_type: str, hours: float) -> bool:
+    """True if an alert of this exact type was delivered for `symbol` within `hours` hours."""
+    with _connect() as conn:
+        cur = conn.execute(
+            """SELECT 1 FROM alerts_log
+               WHERE source=? AND symbol=? AND signal_type=?
+                 AND alerted_at > datetime('now', ?)
+               LIMIT 1""",
+            (source, symbol, signal_type, f"-{hours} hours"),
+        )
+        return cur.fetchone() is not None
+
+
+def _median_since(table: str, column: str, symbol: str, days: int, min_samples: int) -> float | None:
+    if table not in ("funding", "ls_ratios") or column not in ("basis_pct", "retail_ratio"):
+        raise ValueError("unsupported baseline column")
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+    with _connect() as conn:
+        rows = conn.execute(
+            f"SELECT {column} FROM {table} WHERE symbol=? AND ts >= ? AND {column} IS NOT NULL",
+            (symbol, cutoff),
+        ).fetchall()
+    values = sorted(float(r[0]) for r in rows)
+    if len(values) < min_samples:
+        return None
+    mid = len(values) // 2
+    return values[mid] if len(values) % 2 else (values[mid - 1] + values[mid]) / 2
+
+
+def retail_baseline(symbol: str, days: int = 7, min_samples: int = 24) -> float | None:
+    """Median retail long/short ratio over the last `days` days (None if history is too thin).
+
+    The OKX retail ratio sits around 2.7-3.0 almost all the time, so a fixed threshold such as
+    "> 2.60" is true most of the time.  Crowding has to be judged against the ratio's own norm.
+    """
+    return _median_since("ls_ratios", "retail_ratio", symbol, days, min_samples)
+
+
 def basis_baseline(symbol: str, days: int = 7, min_samples: int = 24) -> float | None:
     """Median basis % for `symbol` over the last `days` days.
 

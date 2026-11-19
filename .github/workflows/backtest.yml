@@ -1,0 +1,65 @@
+name: Event-study backtest
+
+# Manual run (Actions tab -> "Event-study backtest" -> Run workflow), or automatically on a
+# pull request that touches the backtest. Results go to the job summary and an artifact;
+# a manual run on main also commits reports/backtest.md.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'backtest.py'
+      - '.github/workflows/backtest.yml'
+
+concurrency:
+  group: backtest-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backtest
+        run: python backtest.py
+
+      - name: Publish results
+        if: always()
+        run: |
+          if [ -f reports/backtest.md ]; then cat reports/backtest.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backtest-report
+          path: reports/backtest.md
+          if-no-files-found: warn
+
+      - name: Commit report (manual run on main only)
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f reports/backtest.md
+          if git diff --staged --quiet; then
+            echo "No change."
+          else
+            git commit -m "chore: backtest report [skip ci]"
+            for i in 1 2 3; do
+              git pull --rebase origin main && git push origin main && break
+              sleep 5
+            done
+          fi

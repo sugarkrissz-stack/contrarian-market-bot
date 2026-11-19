@@ -23,11 +23,11 @@ cooldown:
 # ─── Contrarian Long Thresholds (Retail Fear / Short Squeeze Setup) ───
 contrarian_long:
   fg_max: 20                     # Fear & Greed index < 20 (Extreme Fear)
-  funding_rate_low: -0.00005     # 8h funding rate < -0.00005 (-0.005%, ~-5.48% APR)
-  funding_apr_low: -5.475        # APR equivalent for reference/fallback
+  funding_rate_low: -0.0000731   # 8h funding rate < -0.0000731 (~-8% APR). -5.475% APR fired on ETH ~1/3 of the time
+  funding_apr_low: -8.0          # APR equivalent (kept in sync with funding_rate_low)
   basis_low_pct: -0.03           # basis % < -0.03% (vs baseline if enabled)
   oi_drop_4h_pct: 3.0            # 4h OI drop % >= 3.0% (i.e. delta <= -3.0%)
-  retail_ls_max: 0.75            # retail L/S ratio < 0.75 (Shorts Crowded / Bounce Setup)
+  retail_ls_max: 0.75            # absolute fallback, used only if retail_baseline.enabled is false
   whale_minus_retail_min: 0.35   # OR whale L/S - retail L/S >= 0.35
 
 # ─── Contrarian Short Thresholds (Retail Euphoria / Long Trap Setup) ───
@@ -37,18 +37,35 @@ contrarian_short:
   funding_apr_high: 27.375       # APR equivalent for reference/fallback
   basis_high_pct: 0.08           # basis % > 0.08% (vs baseline if enabled)
   oi_jump_4h_pct: 4.0            # 4h OI jump % >= 4.0% (i.e. delta >= +4.0%)
-  retail_ls_min: 2.60            # retail L/S ratio > 2.60 (Longs Crowded / Squeeze Risk)
+  retail_ls_min: 2.60            # absolute fallback, used only if retail_baseline.enabled is false
   retail_minus_whale_min: 0.80   # OR retail L/S - whale L/S >= 0.80
 
-# ─── Market Shock / Liquidation Flush Rules (1-of-1 Immediate, 3h Cooldown) ───
+# ─── Market Shock / Liquidation Flush ───
+# These describe a move that already happened, so by default they are CONTEXT, not entries:
+#   context = shown in the brief and appended to a contrarian alert on the same asset (default)
+#   alert   = also sent as their own alert (shares the global cap + its own sub-cap below)
+#   off     = not evaluated
 market_shock:
-  cooldown_hours: 3              # 3-hour per-symbol cooldown (never blocked by daily cap)
+  mode: context
+  cooldown_hours: 6              # per-asset cooldown, only used when mode: alert
+  max_alerts_per_day: 1          # shock alerts per rolling 24h, only used when mode: alert
   price_move_1h_pct: 3.5         # |1h price move| >= 3.5%
   price_move_4h_pct: 4.5         # |4h price move| >= 4.5%
   price_move_24h_pct: 5.0        # |24h price move| >= 5.0%
-  oi_flush_drop_pct: 5.0         # 1h or 4h OI drop >= 5.0% (liquidation flush)
+  oi_flush_drop_pct: 5.0         # 1h or 4h drop in OI *contracts* >= 5.0% (USD OI is not used: it falls with price)
   capitulation_fg_max: 15        # Fear & Greed < 15
   capitulation_24h_drop_pct: -4.5 # AND 24h price drop <= -4.5%
+  capitulation_oi_drop_pct: 3.0  # AND OI contracts down >= 3.0% (F&G alone stays <15 for weeks)
+
+# Retail long/short ratio is judged against its own trailing median. On OKX it sits near
+# 2.7-3.0 nearly all the time, so a fixed "> 2.60" test was true ~76% of the time.
+# Retail counts as crowded when it is `dev` above (longs) / below (shorts) the median.
+# With fewer than min_samples rows of history the retail arm is skipped (no guessing).
+retail_baseline:
+  enabled: true
+  days: 7
+  min_samples: 24
+  dev: 0.30
 
 # Basis is measured against each symbol's own normal level, not against zero.
 # A USDT-margined perp sits around -0.05% vs its index almost all the time, so a fixed

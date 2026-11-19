@@ -23,3 +23,4 @@ data/*.db-wal
 !reports/latest_brief.md
 !reports/latest_open_brief.md
 !reports/open_brief_sent.txt
+!reports/backtest.md
