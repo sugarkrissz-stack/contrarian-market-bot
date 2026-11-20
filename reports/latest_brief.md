@@ -1,4 +1,4 @@
-# Contrarian Market Brief — 2026-11-20 20:57 UTC
+# Contrarian Market Brief — 2026-11-20 21:55 UTC
 
 ## Macro Sentiment
 - Fear & Greed Index: **12** (Extreme Fear)
@@ -10,10 +10,10 @@ _Data source this run: OKX (Binance blocked from this server)_
 
 | Symbol | Mark Price | 1h Price Δ | 4h Price Δ | 24h Price Δ | 1h OI Δ | 4h OI Δ | Funding (8h / APR) | Retail L/S (Crowding) | Whale L/S |
 |--------|-----------|------------|------------|-------------|---------|---------|---------------------|-----------------------|-----------|
-| BTCUSDC | $58,318.10 | -0.35% | -2.01% | -6.09% | -0.65% | -3.21% | -0.0022% / -2.42% | 3.0200 | 0.8930 |
-| BTCUSDT | $58,331.50 | -0.35% | -2.01% | -6.09% | -0.65% | -3.21% | -0.0022% / -2.42% | 3.0200 | 0.8933 |
-| ETHUSDC | $1,598.28 | -0.55% | -2.82% | -9.21% | -0.24% | -0.45% | -0.0164% / -17.95% | 3.5500 (Longs Crowded / Squeeze Risk) | 0.8504 |
-| ETHUSDT | $1,598.15 | -0.55% | -2.82% | -9.21% | -0.24% | -0.45% | -0.0167% / -18.26% | 3.5500 (Longs Crowded / Squeeze Risk) | 0.8500 |
+| BTCUSDC | $58,941.80 | +0.83% | -0.37% | -4.21% | -1.79% | -5.44% | -0.0034% / -3.73% | 3.1500 (Longs Crowded / Squeeze Risk) | 0.8889 |
+| BTCUSDT | $58,941.00 | +0.83% | -0.37% | -4.21% | -1.79% | -5.44% | -0.0034% / -3.73% | 3.1000 | 0.8889 |
+| ETHUSDC | $1,617.04 | +0.96% | -0.85% | -7.15% | +0.44% | -0.41% | -0.0213% / -23.35% | 3.6400 (Longs Crowded / Squeeze Risk) | 0.8505 |
+| ETHUSDT | $1,616.47 | +0.96% | -0.85% | -7.15% | +0.44% | -0.41% | -0.0213% / -23.35% | 3.6400 (Longs Crowded / Squeeze Risk) | 0.8509 |
 
 ## Alerts Fired: 0
 
@@ -21,5 +21,5 @@ _No contrarian alerts fired this cycle._
 
 ## Market Shock Context (informational, not an alert)
 
-- **[P1 - BTC] PANIC CAPITULATION** (score 90) — 24h price move -6.09% (|Δ| >= 5.0%); Panic capitulation: Fear & Greed 12 < 15, 24h drop -6.09%, OI contracts -3.21%
-- **[P2 - ETH] SHOCK DUMP** (score 90) — 24h price move -9.21% (|Δ| >= 5.0%)
+- **[P1 - BTC] LIQUIDATION FLUSH** (score 80) — Open Interest (contracts) dropped -5.44% — liquidation flush, longs flushed
+- **[P2 - ETH] SHOCK DUMP** (score 80) — 24h price move -7.15% (|Δ| >= 5.0%)
