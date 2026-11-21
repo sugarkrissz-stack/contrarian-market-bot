@@ -1,4 +1,4 @@
-# Contrarian Market Brief — 2026-11-21 10:53 UTC
+# Contrarian Market Brief — 2026-11-21 11:52 UTC
 
 ## Macro Sentiment
 - Fear & Greed Index: **12** (Extreme Fear)
@@ -10,16 +10,24 @@ _Data source this run: OKX (Binance blocked from this server)_
 
 | Symbol | Mark Price | 1h Price Δ | 4h Price Δ | 24h Price Δ | 1h OI Δ | 4h OI Δ | Funding (8h / APR) | Retail L/S (Crowding) | Whale L/S |
 |--------|-----------|------------|------------|-------------|---------|---------|---------------------|-----------------------|-----------|
-| BTCUSDC | $57,970.80 | -0.04% | -0.08% | -6.52% | +0.45% | +2.04% | -0.0053% / -5.84% | 2.2400 (Shorts Crowded / Bounce Setup) | 0.9235 |
-| BTCUSDT | $57,971.30 | -0.04% | -0.08% | -6.52% | +0.45% | +2.04% | -0.0053% / -5.84% | 2.2400 (Shorts Crowded / Bounce Setup) | 0.9235 |
-| ETHUSDC | $1,642.18 | +0.25% | +0.17% | -6.47% | +0.25% | +2.52% | +0.0000% / +0.01% | 2.5400 (Shorts Crowded / Bounce Setup) | 0.8873 |
-| ETHUSDT | $1,642.27 | +0.25% | +0.17% | -6.47% | +0.25% | +2.52% | +0.0000% / +0.01% | 2.5400 (Shorts Crowded / Bounce Setup) | 0.8873 |
+| BTCUSDC | $58,160.70 | +0.44% | +0.35% | -5.86% | +0.16% | +1.14% | -0.0032% / -3.53% | 2.3100 (Shorts Crowded / Bounce Setup) | 0.9212 |
+| BTCUSDT | $58,152.60 | +0.44% | +0.35% | -5.86% | +0.16% | +1.14% | -0.0032% / -3.53% | 2.3100 (Shorts Crowded / Bounce Setup) | 0.9212 |
+| ETHUSDC | $1,652.83 | +0.78% | +1.41% | -5.44% | -1.68% | +0.21% | +0.0016% / +1.75% | 2.7600 | 0.8766 |
+| ETHUSDT | $1,652.99 | +0.79% | +1.42% | -5.43% | -1.68% | +0.21% | +0.0016% / +1.75% | 2.7500 | 0.8766 |
 
-## Alerts Fired: 0
+## Alerts Fired: 1
 
-_No contrarian alerts fired this cycle._
+### ⚡ [P1 - BTC] [CONTRARIAN] LONG (Score: 70/100)
+- **Trigger Type:** CONTRARIAN
+- **Exact Reason:** Contrarian LONG — 2/3 conditions met: B_retail_ls_low(2.3100 vs 2.7900 median, -0.48<=-0.30, Shorts Crowded / Bounce Setup), C_macro_extreme_fear(fg=12<20) | Shock context: SHOCK DUMP — 24h price move -5.86% (|Δ| >= 5.0%)
+- **Price Moves:** 1h Δ: +0.44% | 4h Δ: +0.35% | 24h Δ: -5.86%
+- **Open Interest Δ:** 1h Δ: +0.16% | 4h Δ: +1.35%
+- **Funding Rate:** -0.0032% (-3.53% APR)
+- **Retail L/S:** 2.3100 (Shorts Crowded / Bounce Setup)
+- **Fear & Greed:** 12 (Extreme Fear)
+
 
 ## Market Shock Context (informational, not an alert)
 
-- **[P1 - BTC] SHOCK DUMP** (score 80) — 24h price move -6.52% (|Δ| >= 5.0%)
-- **[P2 - ETH] SHOCK DUMP** (score 80) — 24h price move -6.47% (|Δ| >= 5.0%)
+- **[P1 - BTC] SHOCK DUMP** (score 80) — 24h price move -5.86% (|Δ| >= 5.0%)
+- **[P2 - ETH] SHOCK DUMP** (score 80) — 24h price move -5.44% (|Δ| >= 5.0%)
