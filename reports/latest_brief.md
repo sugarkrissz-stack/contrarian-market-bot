@@ -1,4 +1,4 @@
-# Contrarian Market Brief — 2026-11-24 07:26 UTC
+# Contrarian Market Brief — 2026-11-24 09:15 UTC
 
 ## Macro Sentiment
 - Fear & Greed Index: **11** (Extreme Fear)
@@ -10,11 +10,19 @@ _Data source this run: OKX (Binance blocked from this server)_
 
 | Symbol | Mark Price | 1h Price Δ | 4h Price Δ | 24h Price Δ | 1h OI Δ | 4h OI Δ | Funding (8h / APR) | Retail L/S (Crowding) | Whale L/S |
 |--------|-----------|------------|------------|-------------|---------|---------|---------------------|-----------------------|-----------|
-| BTCUSDC | $60,424.30 | -0.04% | +0.19% | -1.65% | +0.23% | +1.52% | +0.0025% / +2.75% | 2.5800 | 0.9105 |
-| BTCUSDT | $60,424.30 | -0.04% | +0.19% | -1.65% | +0.23% | +1.52% | +0.0025% / +2.75% | 2.5800 | 0.9105 |
-| ETHUSDC | $1,696.78 | -0.18% | +0.06% | -1.46% | -0.40% | +0.68% | +0.0005% / +0.51% | 2.9400 | 0.8696 |
-| ETHUSDT | $1,696.71 | -0.18% | +0.06% | -1.46% | -0.40% | +0.68% | +0.0005% / +0.51% | 2.9400 | 0.8696 |
+| BTCUSDC | $59,855.50 | -0.66% | -1.27% | -2.58% | +0.12% | +1.01% | +0.0014% / +1.56% | 2.4700 | 0.9137 |
+| BTCUSDT | $59,843.10 | -0.65% | -1.27% | -2.58% | +0.12% | +1.01% | +0.0014% / +1.56% | 2.4700 | 0.9137 |
+| ETHUSDC | $1,679.87 | -0.74% | -1.51% | -2.50% | +0.37% | +0.07% | -0.0011% / -1.20% | 2.8800 | 0.8702 |
+| ETHUSDT | $1,679.83 | -0.74% | -1.51% | -2.50% | +0.37% | +0.07% | -0.0011% / -1.20% | 2.8800 | 0.8702 |
 
-## Alerts Fired: 0
+## Alerts Fired: 1
 
-_No contrarian alerts fired this cycle._
+### ⚡ [P2 - ETH] [CONTRARIAN] LONG (Score: 55/100)
+- **Trigger Type:** CONTRARIAN
+- **Exact Reason:** Contrarian LONG — 2/3 conditions met: A_basis_discount(-0.0469pt vs +0.0636% median, limit -0.0300pt), C_macro_extreme_fear(fg=11<20)
+- **Price Moves:** 1h Δ: -0.74% | 4h Δ: -1.51% | 24h Δ: -2.50%
+- **Open Interest Δ:** 1h Δ: +0.37% | 4h Δ: -0.51%
+- **Funding Rate:** -0.0011% (-1.20% APR)
+- **Retail L/S:** 2.8800 (Balanced)
+- **Fear & Greed:** 11 (Extreme Fear)
+
