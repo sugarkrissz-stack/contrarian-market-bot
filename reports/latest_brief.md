@@ -1,4 +1,4 @@
-# Contrarian Market Brief — 2026-11-28 15:54 UTC
+# Contrarian Market Brief — 2026-11-28 16:56 UTC
 
 ## Macro Sentiment
 - Fear & Greed Index: **10** (Extreme Fear)
@@ -10,19 +10,11 @@ _Data source this run: OKX (Binance blocked from this server)_
 
 | Symbol | Mark Price | 1h Price Δ | 4h Price Δ | 24h Price Δ | 1h OI Δ | 4h OI Δ | Funding (8h / APR) | Retail L/S (Crowding) | Whale L/S |
 |--------|-----------|------------|------------|-------------|---------|---------|---------------------|-----------------------|-----------|
-| BTCUSDC | $59,457.00 | +0.29% | +0.42% | -1.03% | -0.11% | -0.08% | +0.0044% / +4.78% | 3.0300 (Longs Crowded / Squeeze Risk) | 0.8937 |
-| BTCUSDT | $59,457.20 | +0.29% | +0.42% | -1.03% | -0.59% | -0.56% | +0.0044% / +4.78% | 3.0300 (Longs Crowded / Squeeze Risk) | 0.8937 |
-| ETHUSDC | $1,649.24 | +0.14% | +0.11% | -1.32% | +0.14% | -0.06% | +0.0010% / +1.12% | 3.6300 (Longs Crowded / Squeeze Risk) | 0.8348 |
-| ETHUSDT | $1,649.20 | +0.14% | +0.11% | -1.32% | +0.14% | -0.06% | +0.0010% / +1.12% | 3.6300 (Longs Crowded / Squeeze Risk) | 0.8348 |
+| BTCUSDC | $59,533.90 | +0.12% | +0.60% | -0.66% | +0.06% | -0.39% | +0.0045% / +4.98% | 3.1200 (Longs Crowded / Squeeze Risk) | 0.8940 |
+| BTCUSDT | $59,534.70 | +0.12% | +0.60% | -0.66% | +0.06% | -0.39% | +0.0045% / +4.98% | 3.1100 (Longs Crowded / Squeeze Risk) | 0.8940 |
+| ETHUSDC | $1,652.25 | +0.13% | +0.36% | -0.98% | -0.24% | -0.54% | +0.0022% / +2.39% | 3.7800 (Longs Crowded / Squeeze Risk) | 0.8324 |
+| ETHUSDT | $1,652.24 | +0.13% | +0.36% | -0.98% | -0.24% | -0.54% | +0.0022% / +2.39% | 3.6400 (Longs Crowded / Squeeze Risk) | 0.8323 |
 
-## Alerts Fired: 1
+## Alerts Fired: 0
 
-### ⚡ [P2 - ETH] [CONTRARIAN] LONG (Score: 55/100)
-- **Trigger Type:** CONTRARIAN
-- **Exact Reason:** Contrarian LONG — 2/3 conditions met: A_basis_discount(-0.0528pt vs +0.0740% median, limit -0.0300pt), C_macro_extreme_fear(fg=10<20)
-- **Price Moves:** 1h Δ: +0.14% | 4h Δ: +0.11% | 24h Δ: -1.32%
-- **Open Interest Δ:** 1h Δ: +0.14% | 4h Δ: +0.22%
-- **Funding Rate:** +0.0010% (+1.12% APR)
-- **Retail L/S:** 3.6300 (Longs Crowded / Squeeze Risk)
-- **Fear & Greed:** 10 (Extreme Fear)
-
+_No contrarian alerts fired this cycle._
